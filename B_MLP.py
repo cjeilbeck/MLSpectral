@@ -18,9 +18,9 @@ HAIRCUT = True
 left = 600   #this changes accuracy a lot with minor tweaks
 right = 800
 
-MULTIREGION = False
+MULTIREGION = True
 centers = [560,650, 730,860]
-width = 32
+width = [32,32,32,26]
 GRADANALYSIS = True
 
 neurons1=16

@@ -25,7 +25,7 @@ right = 800
 
 MULTIREGION = False
 centers = [560,650, 730,860]
-width = 32
+width = [32,32,32,26]
 
 
 neurons1=16
@@ -33,8 +33,8 @@ neurons2=8
 kernel=3  #convolutional kernel
 poolkernel=2 #pooling kernel
 noisefactor=0
-dropprob=0.5 #dropout layer
-epochs=100
+dropprob=0.5 #dropout layer    might be unneccesary
+epochs=400
 lr=0.001
 seed = 49
 test_sizeinput = 0.2
@@ -80,7 +80,7 @@ class Oliver(nn.Module):
         self.drop = nn.Dropout1d(dropprob)
         
     def forward(self, x):
-        x = F.tanh(self.conv1(x)) #think i prefer the attribution graph when tanh used in first CL, less attribution given to calibration error at 760-780nm
+        x = torch.tanh(self.conv1(x)) #think i prefer the attribution graph when tanh used in first CL, less attribution given to calibration error at 760-780nm
         x = self.pool(x)
         x = F.relu(self.conv2(x))
         x = self.pool(x)
@@ -89,8 +89,8 @@ class Oliver(nn.Module):
         return x
 
 model = Oliver(idim,odim)
-model = nn.DataParallel(model) 
-model = model.to('cuda')
+
+model = model.to(device)
 optimizer = optim.Adam(model.parameters(), lr=lr)
 lossfunc = nn.CrossEntropyLoss()
 

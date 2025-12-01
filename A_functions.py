@@ -11,17 +11,27 @@ def haircut(x,left,right):
     x = x.iloc[: ,left+1:total_cols-right]
     return x
 
-def multiregion(x,centers,width):
+def multiregion(x,centres, width, Dif=True):
     x.columns = pd.to_numeric(x.columns)
+    if Dif:
+        width=np.array(width)
     rad = width / 2
     all_regions = []
-    for c in centers:
-        start_wav = c - rad
-        end_wav = c + rad
-        region = (x.columns>=start_wav) & (x.columns<=end_wav)
-        all_regions.append(region)
+    if Dif:
+        for c, r in zip(centres, rad):
+            start_wav = c - r
+            end_wav = c + r
+            region = (x.columns>=start_wav) & (x.columns<=end_wav)
+            all_regions.append(region)
+    else:
+        for c in centres:
+            start_wav = c - rad
+            end_wav = c + rad
+            region = (x.columns>=start_wav) & (x.columns<=end_wav)
+            all_regions.append(region)
+
     final_region = np.logical_or.reduce(all_regions)
-    x = x.loc[:,final_region]
+    x = x.loc[:,final_region]   
     return x
 
 def scaling(x_train, x_test):
@@ -95,5 +105,5 @@ def moving_average(input,window):
     movingav = windows.mean()
     movingav = movingav.tolist()
     movingav = movingav[window-1:]
-    
+
     return movingav
