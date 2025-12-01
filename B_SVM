@@ -1,0 +1,86 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.decomposition import PCA              
+from sklearn.pipeline import Pipeline            
+from sklearn.metrics import accuracy_score, classification_report
+import matplotlib.pyplot as plt  
+from scipy.signal import savgol_filter
+from sklearn.preprocessing import FunctionTransformer
+from A_functions import haircut, multiregion,read_data
+
+def apply_savgol(x):
+    return savgol_filter(x, window_length=51, polyorder=3, axis=1)
+
+USE_SCALING = True
+USE_PCA = True
+USE_SAVGOL = True
+HAIRCUT = True 
+z = 42  # Seed
+comp = 6  # PCA components
+left= 400
+right=800
+#3648 wavelength values for reference, 345 - 1038nm
+
+test_sizeinput = 0.2
+MULTIREGION = False
+centers = [550,700]  #860 +-26
+width = 32
+
+
+x,y=read_data("CSVfiles/datacalibrated.csv")
+
+if HAIRCUT:
+    x = haircut(x,left,right)
+    print(f"trimmed wav:",x.columns[0],x.columns[-1])
+if MULTIREGION:
+    x = multiregion(x, centers, width)
+
+x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=test_sizeinput,random_state=z,stratify=y)
+
+pipeline_steps = []
+
+if USE_SAVGOL:
+    pipeline_steps.append(('savgol', FunctionTransformer(apply_savgol)))
+
+if USE_SCALING:
+    pipeline_steps.append(('scaler', StandardScaler()))
+
+if USE_PCA:
+    pipeline_steps.append(('pca', PCA(n_components=comp)))
+
+pipeline_steps.append(('svm_model', SVC()))
+model = Pipeline(pipeline_steps)
+
+
+model.fit(x_train, y_train)
+y_pred = model.predict(x_test)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy:.4f}")
+print("Classification Report:")
+print(classification_report(y_test, y_pred))
+
+if USE_PCA:
+
+    pcn = model.named_steps['pca'].n_components
+    print(f"{pcn} components.")
+
+    pca = model.named_steps['pca']
+    
+    x_wavelengths = pd.to_numeric(x.columns)
+    plt.figure(figsize=(12, 3*pcn))
+    
+    for i in range(pcn):
+    
+        loadings = abs(pca.components_[i])  
+        plt.subplot(pcn, 1, i + 1)
+        plt.plot(x_wavelengths, loadings)
+        plt.ylabel('loading (abs value)')
+    
+    plt.xlabel('Wavelength (nm)')
+    plt.tight_layout()
+    plt.show()
+    
+
+

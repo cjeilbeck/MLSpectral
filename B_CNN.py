@@ -1,0 +1,131 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import torch 
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, classification_report
+from scipy.signal import savgol_filter
+from A_functions import haircut, multiregion,scaling,read_data,cudacheck,gradanal
+
+
+DIAGNOSTICS=False
+device=cudacheck(DIAGNOSTICS)
+USE_SCALING = True 
+GRADANALYSIS = True
+
+USE_SAVGOL = True
+smooth =51
+
+HAIRCUT = True 
+left = 600
+right = 800
+
+MULTIREGION = False
+centers = [560,650, 730,860]
+width = 32
+
+
+neurons1=16
+neurons2=8
+kernel =3
+noisefactor=0
+epochs=100
+lr=0.001
+seed = 49
+test_sizeinput = 0.2
+torch.manual_seed(seed)
+np.random.seed(seed)
+x,y=read_data("CSVfiles/datacalibrated.csv")
+
+if HAIRCUT:
+    x = haircut(x, left, right)
+    print(f"trimmed wav:",x.columns[0],x.columns[-1])
+if MULTIREGION:
+    x = multiregion(x, centers, width)
+
+labelencoder = LabelEncoder()
+y_encoded = labelencoder.fit_transform(y)
+x_train,x_test,y_train,y_test = train_test_split(x,y_encoded,test_size=test_sizeinput,random_state=seed,stratify=y_encoded)
+
+if USE_SAVGOL:
+    x_train = savgol_filter(x_train,window_length=smooth,polyorder=3, axis=1)
+    x_test = savgol_filter(x_test,window_length=smooth,polyorder=3, axis=1)
+
+if USE_SCALING:
+    x_train,x_test=scaling(x_train, x_test)
+
+idim = x_train.shape[1]  # inputL
+odim = len(np.unique(y_encoded))  #output classes
+x_traint = torch.tensor(x_train, dtype=torch.float32).unsqueeze(1).to(device)
+y_traint = torch.tensor(y_train, dtype=torch.long).to(device)
+x_testt = torch.tensor(x_test, dtype=torch.float32).unsqueeze(1).to(device)
+y_testt = torch.tensor(y_test, dtype=torch.long).to(device)
+
+class Oliver(nn.Module):
+    def __init__(self, input_L, classes_N):
+        super().__init__() 
+        self.conv1 = nn.Conv1d(in_channels=1,out_channels=neurons1,kernel_size=kernel, padding=(kernel-1)//2)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.conv2 =nn.Conv1d(in_channels=neurons1,out_channels=neurons2,kernel_size=kernel, padding=(kernel-1)//2)
+        self.final_len = input_L//4 #pooling 2x
+        self.flattened = neurons2 * self.final_len
+
+        self.fc = nn.Linear(self.flattened, classes_N)
+        
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.pool(x)
+        x = F.relu(self.conv2(x))
+        x = self.pool(x)
+        x = x.reshape(x.shape[0],-1)  
+        x = self.fc(x)
+        return x
+
+model = Oliver(idim,odim)
+model = nn.DataParallel(model) 
+model = model.to('cuda')
+optimizer = optim.Adam(model.parameters(), lr=lr)
+lossfunc = nn.CrossEntropyLoss()
+
+for epoch in range(epochs):
+    model.train()
+    optimizer.zero_grad()
+    outputs = model(x_traint)
+    loss = lossfunc(outputs, y_traint)
+    loss.backward()
+    optimizer.step()
+    print(epoch)
+
+noise = torch.randn_like(x_testt)*noisefactor
+x_testn = x_testt + noise
+
+model.eval()
+with torch.no_grad():
+    test_outputs = model(x_testn)
+    _, y_pred = torch.max(test_outputs, 1)
+
+y_pred = y_pred.cpu()
+y_testt = y_testt.cpu()
+
+y_prednp = y_pred.numpy()
+y_testnp = y_testt.numpy()
+
+predlabels = labelencoder.inverse_transform(y_prednp)
+testlabels = labelencoder.inverse_transform(y_testnp)
+
+accuracy = accuracy_score(testlabels, predlabels)
+print(f"Accuracy: {accuracy:.6f}")
+print("Classification Report:")
+print(classification_report(testlabels, predlabels))
+
+if GRADANALYSIS:
+    wav, smoothed_attr = gradanal(model,x,x_testt,y_testt, smooth,left,right, device,batch=True)
+    plt.figure(figsize=(10, 5))
+    plt.plot(wav, smoothed_attr, color='purple')
+    plt.title("Attributions across dataset")
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("Importance")
+    plt.show()
