@@ -31,8 +31,9 @@ width = 32
 neurons1=16
 neurons2=8
 kernel =3
+poolkernel=2
 noisefactor=0
-epochs=100
+epochs=400
 lr=0.001
 seed = 49
 test_sizeinput = 0.2
@@ -68,15 +69,15 @@ class Oliver(nn.Module):
     def __init__(self, input_L, classes_N):
         super().__init__() 
         self.conv1 = nn.Conv1d(in_channels=1,out_channels=neurons1,kernel_size=kernel, padding=(kernel-1)//2)
-        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.pool = nn.MaxPool1d(kernel_size=poolkernel)
         self.conv2 =nn.Conv1d(in_channels=neurons1,out_channels=neurons2,kernel_size=kernel, padding=(kernel-1)//2)
-        self.final_len = input_L//4 #pooling 2x
+        self.final_len = input_L//poolkernel**2
         self.flattened = neurons2 * self.final_len
 
         self.fc = nn.Linear(self.flattened, classes_N)
         
     def forward(self, x):
-        x = F.relu(self.conv1(x))
+        x = F.tanh(self.conv1(x)) #think i prefer the attribution graph when tanh used in first CL, less attribution given to calibration error at 760-780nm
         x = self.pool(x)
         x = F.relu(self.conv2(x))
         x = self.pool(x)
@@ -97,8 +98,7 @@ for epoch in range(epochs):
     loss = lossfunc(outputs, y_traint)
     loss.backward()
     optimizer.step()
-    print(epoch)
-
+    print(epoch) if epoch%10 == 0 else None
 noise = torch.randn_like(x_testt)*noisefactor
 x_testn = x_testt + noise
 
