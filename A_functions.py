@@ -86,3 +86,14 @@ def gradanal(model, x, x_testt, y_testt, smooth, left, right, device, batch=Fals
     return wav, smoothed_attr
     
 
+
+def moving_average(input,window):
+
+    input = pd.Series(input)
+    windows = input.rolling(window)
+
+    movingav = windows.mean()
+    movingav = movingav.tolist()
+    movingav = movingav[window-1:]
+    
+    return movingav

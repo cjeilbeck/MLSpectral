@@ -1,8 +1,12 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
+from A_functions import moving_average
+
 
 SAVGOL = True
+
+MOV = False
 HAIRCUT = True
 start= 600
 end = 2800
@@ -28,6 +32,8 @@ for leaf_type in file_avg.index:
     
     if SAVGOL:
         y_counts = savgol_filter(y_counts,window_length=51, polyorder=3)
+    if MOV:
+        y_counts = moving_average(y_counts,51)
     if HAIRCUT:
         y_plot = y_counts[start:end]
     else:

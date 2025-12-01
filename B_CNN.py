@@ -18,7 +18,7 @@ GRADANALYSIS = True
 
 USE_SAVGOL = True
 smooth =51
-
+poly=3
 HAIRCUT = True 
 left = 600
 right = 800
@@ -30,10 +30,11 @@ width = 32
 
 neurons1=16
 neurons2=8
-kernel =3
-poolkernel=2
+kernel=3  #convolutional kernel
+poolkernel=2 #pooling kernel
 noisefactor=0
-epochs=400
+dropprob=0.5 #dropout layer
+epochs=100
 lr=0.001
 seed = 49
 test_sizeinput = 0.2
@@ -52,8 +53,8 @@ y_encoded = labelencoder.fit_transform(y)
 x_train,x_test,y_train,y_test = train_test_split(x,y_encoded,test_size=test_sizeinput,random_state=seed,stratify=y_encoded)
 
 if USE_SAVGOL:
-    x_train = savgol_filter(x_train,window_length=smooth,polyorder=3, axis=1)
-    x_test = savgol_filter(x_test,window_length=smooth,polyorder=3, axis=1)
+    x_train = savgol_filter(x_train,window_length=smooth,polyorder=poly, axis=1)
+    x_test = savgol_filter(x_test,window_length=smooth,polyorder=poly, axis=1)
 
 if USE_SCALING:
     x_train,x_test=scaling(x_train, x_test)
@@ -75,6 +76,8 @@ class Oliver(nn.Module):
         self.flattened = neurons2 * self.final_len
 
         self.fc = nn.Linear(self.flattened, classes_N)
+
+        self.drop = nn.Dropout1d(dropprob)
         
     def forward(self, x):
         x = F.tanh(self.conv1(x)) #think i prefer the attribution graph when tanh used in first CL, less attribution given to calibration error at 760-780nm
@@ -82,7 +85,7 @@ class Oliver(nn.Module):
         x = F.relu(self.conv2(x))
         x = self.pool(x)
         x = x.reshape(x.shape[0],-1)  
-        x = self.fc(x)
+        x = self.drop(self.fc(x))
         return x
 
 model = Oliver(idim,odim)
@@ -99,7 +102,8 @@ for epoch in range(epochs):
     loss.backward()
     optimizer.step()
     print(epoch) if epoch%10 == 0 else None
-noise = torch.randn_like(x_testt)*noisefactor
+
+noise = torch.randn_like(x_testt)*noisefactor #gaussian noise
 x_testn = x_testt + noise
 
 model.eval()
