@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch 
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.decomposition import PCA    
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -15,7 +17,8 @@ DIAGNOSTICS=False
 device=cudacheck(DIAGNOSTICS)
 USE_SCALING = True 
 GRADANALYSIS = True
-
+USE_PCA=True 
+ncomp = 4
 USE_SAVGOL = True
 smooth =51
 poly=3
@@ -58,6 +61,11 @@ if USE_SAVGOL:
 
 if USE_SCALING:
     x_train,x_test=scaling(x_train, x_test)
+if USE_PCA:
+    pca = PCA(n_components=ncomp)
+    pca.fit(x_train)
+    x_train = pca.transform(x_train)
+    x_test = pca.transform(x_test)
 
 idim = x_train.shape[1]  # inputL
 odim = len(np.unique(y_encoded))  #output classes
@@ -70,7 +78,7 @@ class Oliver(nn.Module):
     def __init__(self, input_L, classes_N):
         super().__init__() 
         self.conv1 = nn.Conv1d(in_channels=1,out_channels=neurons1,kernel_size=kernel, padding=(kernel-1)//2)
-        self.pool = nn.MaxPool1d(kernel_size=poolkernel)
+        self.pool = nn.MaxPool1d(kernel_size=poolkernel) # maxpool or avgpool? 
         self.conv2 =nn.Conv1d(in_channels=neurons1,out_channels=neurons2,kernel_size=kernel, padding=(kernel-1)//2)
         self.final_len = input_L//poolkernel**2
         self.flattened = neurons2 * self.final_len
@@ -80,7 +88,7 @@ class Oliver(nn.Module):
         self.drop = nn.Dropout1d(dropprob)
         
     def forward(self, x):
-        x = torch.tanh(self.conv1(x)) #think i prefer the attribution graph when tanh used in first CL, less attribution given to calibration error at 760-780nm
+        x = torch.tanh(self.conv1(x)) #tanh or Relu?
         x = self.pool(x)
         x = F.relu(self.conv2(x))
         x = self.pool(x)
@@ -125,8 +133,19 @@ print(f"Accuracy: {accuracy:.6f}")
 print("Classification Report:")
 print(classification_report(testlabels, predlabels))
 
+
+if USE_PCA:
+
+    PC = np.arange(pca.n_components) + 1
+    plt.plot(PC, pca.explained_variance_ratio_, color='red')
+    plt.title('Scree Plot')
+    plt.xlabel('Principal Component')
+    plt.ylabel('Variance contribution')
+    plt.show()
+
+
 if GRADANALYSIS:
-    wav, smoothed_attr = gradanal(model,x,x_testt,y_testt, smooth,left,right, device,batch=True)
+    wav, smoothed_attr = gradanal(model,x,x_testt,y_testt, 51,left,right, device,batch=True)
     plt.figure(figsize=(10, 5))
     plt.plot(wav, smoothed_attr, color='purple')
     plt.title("Attributions across dataset")

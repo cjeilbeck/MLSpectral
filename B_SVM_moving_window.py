@@ -13,15 +13,18 @@ def apply_savgol(x):
     return savgol_filter(x, window_length=11,polyorder=3,axis=1)
 
 USE_SCALING = True
-USE_PCA = False
 USE_SAVGOL = False
 seed = 47     # Seed
 comp = 6    # PCA components
 
+KERNEL = 'linear' #try 'linear', 'poly', 'rbf', 'sigmoid' 
+C = 1.0        
+GAMMA = 'scale'
+
 #3648 wavelength values for reference, 345 - 1038nm
 
-window = 32.0
-step = 1
+window = 32
+step = 12
 x,y=read_data("CSVfiles/datacalibrated.csv")
 wav = pd.to_numeric(x.columns)
 start = wav.min()
@@ -36,13 +39,13 @@ if USE_SAVGOL:
 if USE_SCALING:
     pipeline_steps.append(('scaler', StandardScaler()))
 
-pipeline_steps.append(('svm_model', SVC()))
+pipeline_steps.append(('svm_model', SVC(kernel=KERNEL,C=C,gamma=GAMMA)))
 
 while win_start + window <= end:
     win_end = win_start+window
     center = win_start+(window/2.0)
     
-    x_window = multiregion(x, np.array([center]), window)
+    x_window = multiregion(x, np.array([center]), window, Dif=False)
     n_features = x_window.shape[1]
     
     x_train,x_test,y_train,y_test = train_test_split(x_window,y,test_size=0.2,random_state=seed,stratify=y)
