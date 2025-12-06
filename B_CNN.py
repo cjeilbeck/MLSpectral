@@ -17,7 +17,7 @@ DIAGNOSTICS=False
 device=cudacheck(DIAGNOSTICS)
 USE_SCALING = True 
 GRADANALYSIS = True
-USE_PCA=True 
+USE_PCA=False 
 ncomp = 4
 USE_SAVGOL = True
 smooth =51
@@ -33,7 +33,8 @@ width = [32,32,32,26]
 
 neurons1=16
 neurons2=8
-kernel=3  #convolutional kernel
+kernel1=3
+kernel2=3  #convolutional kernels
 poolkernel=2 #pooling kernel
 noisefactor=0
 dropprob=0.5 #dropout layer    might be unneccesary
@@ -77,9 +78,9 @@ y_testt = torch.tensor(y_test, dtype=torch.long).to(device)
 class Oliver(nn.Module):
     def __init__(self, input_L, classes_N):
         super().__init__() 
-        self.conv1 = nn.Conv1d(in_channels=1,out_channels=neurons1,kernel_size=kernel, padding=(kernel-1)//2)
+        self.conv1 = nn.Conv1d(in_channels=1,out_channels=neurons1,kernel_size=kernel1, padding=(kernel1-1)//2)
         self.pool = nn.MaxPool1d(kernel_size=poolkernel) # maxpool or avgpool? 
-        self.conv2 =nn.Conv1d(in_channels=neurons1,out_channels=neurons2,kernel_size=kernel, padding=(kernel-1)//2)
+        self.conv2 =nn.Conv1d(in_channels=neurons1,out_channels=neurons2,kernel_size=kernel2, padding=(kernel2-1)//2)
         self.final_len = input_L//poolkernel**2
         self.flattened = neurons2 * self.final_len
 

@@ -15,11 +15,11 @@ def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
 
 USE_SCALING = True
-USE_PCA = False
+USE_PCA = True
 USE_SAVGOL = True
 HAIRCUT = True 
 z = 42  # Seed
-comp = 6  # PCA components
+comp = 4 # PCA components
 left= 600
 right=800
 #3648 wavelength values for reference, 345 - 1038nm

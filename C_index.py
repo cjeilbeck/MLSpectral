@@ -11,7 +11,7 @@ file = pd.read_csv('CSVfiles/datacalibrated.csv')
 data = file.drop(columns=['leaf_type','sample_id'])
 wav = pd.to_numeric(data.columns)
 
-def multimean(center):
+def multimean(center):   #integrate rather than mean
     start = center-rad
     end = center+rad
     region = (wav>=start) & (wav<=end)
