@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
 from scipy.signal import savgol_filter
-from A_functions import haircut, multiregion,scaling,read_data,cudacheck,gradanal
+from A_functions import haircut, multiregion,scaling,read_data,cudacheck,gradanal,multispectral, indices
 
 
 DIAGNOSTICS=False
@@ -19,16 +19,19 @@ USE_SCALING = True
 GRADANALYSIS = True
 USE_PCA=False 
 ncomp = 4
-USE_SAVGOL = True
+USE_SAVGOL = False
 smooth =51
 poly=3
-HAIRCUT = True 
+HAIRCUT = False 
 left = 600
 right = 800
 
 MULTIREGION = False
 centers = [560,650, 730,860]
 width = [32,32,32,26]
+
+INDICES = True
+
 
 
 neurons1=16
@@ -50,7 +53,10 @@ if HAIRCUT:
     x = haircut(x, left, right)
     print(f"trimmed wav:",x.columns[0],x.columns[-1])
 if MULTIREGION:
-    x = multiregion(x, centers, width)
+    x = multispectral(x, centers, width)
+
+if INDICES:
+    x = indices(x)
 
 labelencoder = LabelEncoder()
 y_encoded = labelencoder.fit_transform(y)
@@ -146,10 +152,19 @@ if USE_PCA:
 
 
 if GRADANALYSIS:
-    wav, smoothed_attr = gradanal(model,x,x_testt,y_testt, 51,left,right, device,batch=True)
-    plt.figure(figsize=(10, 5))
-    plt.plot(wav, smoothed_attr, color='purple')
-    plt.title("Attributions across dataset")
-    plt.xlabel("Wavelength (nm)")
-    plt.ylabel("Importance")
-    plt.show()
+    wav, smoothed_attr = gradanal(model,x,x_testt,y_testt, 51,left,right, device,batch=True, savgol=USE_SAVGOL,islabel=INDICES)
+    if INDICES:
+        plt.figure(figsize=(10, 5))
+        plt.bar(wav, smoothed_attr, color='purple')
+        plt.xticks(rotation=90)
+        plt.title("Attributions across dataset")
+        plt.xlabel("Wavelength (nm)")
+        plt.ylabel("Importance")
+        plt.show()
+    else:
+        plt.figure(figsize=(10, 5))
+        plt.plot(wav, smoothed_attr, color='purple')
+        plt.title("Attributions across dataset")
+        plt.xlabel("Wavelength (nm)")
+        plt.ylabel("Importance")
+        plt.show()

@@ -8,16 +8,16 @@ from sklearn.metrics import accuracy_score, classification_report
 import matplotlib.pyplot as plt  
 from scipy.signal import savgol_filter
 from sklearn.preprocessing import FunctionTransformer
-from A_functions import haircut, multiregion,read_data
+from A_functions import haircut, multiregion,read_data,multispectral,indices
 import numpy as np
 
 def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
 
 USE_SCALING = True
-USE_PCA = True
-USE_SAVGOL = True
-HAIRCUT = True 
+USE_PCA = False
+USE_SAVGOL = False
+HAIRCUT = False 
 z = 42  # Seed
 comp = 4 # PCA components
 left= 600
@@ -25,11 +25,13 @@ right=800
 #3648 wavelength values for reference, 345 - 1038nm
 
 test_sizeinput = 0.2
-MULTIREGION = False
+MULTIREGION = True
 centers = [560,650, 730,860]  
 width = [32,32,32,26]
 
-KERNEL = 'linear' #try 'linear', 'poly', 'rbf', 'sigmoid'   linear performs best which makes sense
+INDICES = False # does not work for SVM yet will figure it out
+
+KERNEL = 'rbf' #try 'linear', 'poly', 'rbf', 'sigmoid'   linear performs best on spectral, rbf maybe multispectral
 C = 1.0        # regularization
 GAMMA = 'scale' # kernel coefficient 
 
@@ -39,8 +41,9 @@ if HAIRCUT:
     x = haircut(x,left,right)
     print(f"trimmed wav:",x.columns[0],x.columns[-1])
 if MULTIREGION:
-    x = multiregion(x, centers, width)
-
+    x = multispectral(x, centers, width)
+if INDICES:
+    x = indices(x)
 x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=test_sizeinput,random_state=z,stratify=y)
 
 pipeline_steps = []

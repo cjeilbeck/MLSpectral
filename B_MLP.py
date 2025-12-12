@@ -11,7 +11,7 @@ from A_functions import haircut,multiregion,read_data,scaling,gradanal
 import matplotlib.pyplot as plt
 
 USE_SCALING = True 
-USE_PCA=True 
+USE_PCA=False 
 ncomp = 4
 USE_SAVGOL = True
 smooth =51
