@@ -10,8 +10,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
 from scipy.signal import savgol_filter
-from A_functions import haircut, multiregion,scaling,read_data,cudacheck,gradanal,multispectral, indices
-
+from A_functions import haircut, multiregion,scaling,read_data,cudacheck,gradanal,multispectral, indicesmav,indicespaper
+plt.rcParams.update({'font.size': 14})
 
 DIAGNOSTICS=False
 device=cudacheck(DIAGNOSTICS)
@@ -19,34 +19,40 @@ USE_SCALING = True
 GRADANALYSIS = True
 USE_PCA=False 
 ncomp = 4
-USE_SAVGOL = False
+USE_SAVGOL = True
 smooth =51
 poly=3
-HAIRCUT = False 
-left = 600
-right = 800
+HAIRCUT = True
+left = 200
+right = 900
 
 MULTIREGION = False
 centers = [560,650, 730,860]
 width = [32,32,32,26]
 
-INDICES = True
+INDICES = False
+if INDICES:
+    HAIRCUT = False
+    USE_SAVGOL = False
+    MULTIREGION = False
 
 
-
-neurons1=16
-neurons2=8
+neurons1=8
+neurons2=16
 kernel1=3
 kernel2=3  #convolutional kernels
 poolkernel=2 #pooling kernel
 noisefactor=0
-dropprob=0.5 #dropout layer    might be unneccesary
-epochs=400
+dropprob=0.2 #dropout layer    might be unneccesary
+epochs=500
 lr=0.001
-seed = 49
+seed = 42
 test_sizeinput = 0.2
 torch.manual_seed(seed)
 np.random.seed(seed)
+torch.cuda.manual_seed(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 x,y=read_data("CSVfiles/datacalibrated.csv")
 
 if HAIRCUT:
@@ -56,7 +62,7 @@ if MULTIREGION:
     x = multispectral(x, centers, width)
 
 if INDICES:
-    x = indices(x)
+    x = indicesmav(x)
 
 labelencoder = LabelEncoder()
 y_encoded = labelencoder.fit_transform(y)
@@ -95,12 +101,13 @@ class Oliver(nn.Module):
         self.drop = nn.Dropout1d(dropprob)
         
     def forward(self, x):
-        x = torch.tanh(self.conv1(x)) #tanh or Relu?
-        x = self.pool(x)
+        x = F.relu(self.conv1(x))#tanh or Relu?
+        x = self.drop(x)
+        x = self.pool(x)  
         x = F.relu(self.conv2(x))
         x = self.pool(x)
         x = x.reshape(x.shape[0],-1)  
-        x = self.drop(self.fc(x))
+        x = (self.fc(x))
         return x
 
 model = Oliver(idim,odim)
@@ -145,7 +152,6 @@ if USE_PCA:
 
     PC = np.arange(pca.n_components) + 1
     plt.plot(PC, pca.explained_variance_ratio_, color='red')
-    plt.title('Scree Plot')
     plt.xlabel('Principal Component')
     plt.ylabel('Variance contribution')
     plt.show()
@@ -157,14 +163,12 @@ if GRADANALYSIS:
         plt.figure(figsize=(10, 5))
         plt.bar(wav, smoothed_attr, color='purple')
         plt.xticks(rotation=90)
-        plt.title("Attributions across dataset")
         plt.xlabel("Wavelength (nm)")
-        plt.ylabel("Importance")
+        plt.ylabel("Mean Absolute Attribution")
         plt.show()
     else:
         plt.figure(figsize=(10, 5))
         plt.plot(wav, smoothed_attr, color='purple')
-        plt.title("Attributions across dataset")
         plt.xlabel("Wavelength (nm)")
-        plt.ylabel("Importance")
+        plt.ylabel("Mean Absolute Attribution")
         plt.show()

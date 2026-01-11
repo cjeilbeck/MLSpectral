@@ -105,7 +105,7 @@ def gradanal(model, x, x_testt, y_testt, smooth, left, right, device, batch=Fals
             attrs_batch = ig.attribute(batch_in, target=labels,n_steps=50)
             total_attributions += torch.sum(torch.abs(attrs_batch), dim=0)
 
-        total_attributions = total_attributions/n
+        total_attributions = total_attributions/len(x_testt)
         finalat = total_attributions.squeeze().cpu().detach().numpy()
         if savgol:
             smoothed_attr = savgol_filter(finalat, window_length=smooth, polyorder=3)
@@ -147,12 +147,11 @@ def moving_average(input,window):
 
 
 
-def indices(x):
+def indicespaper(x):
 
     def M(w):
         intensity = multispectral(x, [w], width=5, Dif=False)
         return intensity.iloc[:, 0]
-
 
     ids = {}
     ids['NDVI']= (M(830)-M(650))/(M(830)+M(650))
@@ -205,3 +204,21 @@ def indices(x):
     ids['RVI']= M(765)/M(720)
 
     return pd.DataFrame(ids, index=x.index)
+
+def indicesmav(x):   #assuming mavic 3M
+    def M(w, width=16):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+
+    ids = {}
+    ids['Green'] = M(560) 
+    ids['Red'] = M(650)
+    ids['Red-edge'] = M(730)
+    ids['NIR'] = M(860, width=26)
+    ids['NDVI']= (M(860, width=26)-M(650))/(M(860, width=26)+M(650))
+    ids['GNDVI']=(M(730)-M(560))/(M(730)+M(560))
+    ids['OSAVI']= (M(860, width=26)-M(650))/(M(860, width=26)+M(650)+0.16)
+    ids['LCI']= (M(860, width=26)-M(730))/(M(860, width=26)+M(650))
+    ids['NDRE']= (M(860, width=26)-M(730))/(M(860, width=26)+M(730))
+ 
+    return pd.DataFrame(ids, index=x.index) 

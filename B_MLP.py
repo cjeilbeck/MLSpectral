@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
 from scipy.signal import savgol_filter
-from A_functions import haircut,multiregion,read_data,scaling,gradanal
+from A_functions import haircut,multiregion,read_data,scaling,gradanal, multispectral, indicesmav, indicespaper
 import matplotlib.pyplot as plt
 
 USE_SCALING = True 
@@ -17,31 +17,36 @@ USE_SAVGOL = True
 smooth =51
 
 HAIRCUT = True 
-left = 600   #this changes accuracy a lot with minor tweaks
-right = 800
+left = 200  #this changes accuracy a lot with minor tweaks
+right = 900
 
 MULTIREGION = False
 centers = [560,650, 730,860]
 width = [32,32,32,26]
 GRADANALYSIS = True
 
+INDICES = False
+
+
 neurons1=16
 neurons2=8
-epochs = 1000
+epochs = 500
 noisefactor = 0.0
 lr=0.001
-seed = 49
+seed = 42
 test_sizeinput = 0.2
 torch.manual_seed(seed)
 np.random.seed(seed)
 
 x,y=read_data("CSVfiles/datacalibrated.csv")
 
+if INDICES:
+    x = indicesmav(x)
 if HAIRCUT:
     x = haircut(x,left, right)
     print(f"trimmed wav:",x.columns[0],x.columns[-1])
 if MULTIREGION:
-    x = multiregion(x, centers, width)
+    x = multispectral(x, centers, width)
 
 labelencoder = LabelEncoder()
 y_encoded = labelencoder.fit_transform(y)
@@ -117,10 +122,17 @@ if USE_PCA:
     plt.show()
 
 if GRADANALYSIS:
-    wav, smoothed_attr = gradanal(model,x,x_testt,y_testt,smooth,left,right,0)
-    plt.figure(figsize=(10, 5))
-    plt.plot(wav, smoothed_attr, color='purple')
-    plt.title("Attributions across dataset")
-    plt.xlabel("Wavelength (nm)")
-    plt.ylabel("Importance")
-    plt.show()
+    wav, smoothed_attr = gradanal(model,x,x_testt,y_testt,smooth,left,right,0,savgol=USE_SAVGOL,islabel=INDICES)
+    if INDICES:
+        plt.figure(figsize=(10, 5))
+        plt.bar(wav, smoothed_attr, color='purple')
+        plt.xticks(rotation=90)
+        plt.xlabel("Wavelength (nm)")
+        plt.ylabel("Mean Absolute Attribution")
+        plt.show()
+    else:
+        plt.figure(figsize=(10, 5))
+        plt.plot(wav, smoothed_attr, color='purple')
+        plt.xlabel("Wavelength (nm)")
+        plt.ylabel("Mean Absolute Attribution")
+        plt.show()

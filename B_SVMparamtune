@@ -10,16 +10,17 @@ from scipy.signal import savgol_filter
 from sklearn.preprocessing import FunctionTransformer
 from A_functions import haircut,read_data,multispectral,indicesmav
 import numpy as np
-
+import seaborn as sns
+from sklearn.model_selection import GridSearchCV
 def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
 
 USE_SCALING = True
-USE_PCA = True
+USE_PCA = False
 USE_SAVGOL = True
 HAIRCUT = True 
 z = 42  # Seed
-comp = 3 # PCA components
+comp = 4 # PCA components
 left= 200
 right=900
 #3648 wavelength values for reference, 345 - 1038nm
@@ -31,9 +32,9 @@ width = [32,32,32,26]
 
 INDICES = False # does not work for SVM yet will figure it out
 
-KERNEL = 'rbf' #try 'linear', 'poly', 'rbf', 'sigmoid'   linear performs best on spectral, rbf maybe multispectral
-C = 1000        # regularization
-GAMMA = 1e-4 # kernel coefficient 
+KERNEL = 'linear' #try 'linear', 'poly', 'rbf', 'sigmoid'   linear performs best on spectral, rbf maybe multispectral
+C = 1.0        # regularization
+GAMMA = 'scale' # kernel coefficient 
 
 x,y=read_data("CSVfiles/datacalibrated.csv")
 
@@ -61,33 +62,21 @@ pipeline_steps.append(('svm_model', SVC(kernel=KERNEL, C=C, gamma=GAMMA)))
 model = Pipeline(pipeline_steps)
 
 
-model.fit(x_train, y_train)
-y_pred = model.predict(x_test)
-accuracy = accuracy_score(y_test, y_pred)
-print(f"Accuracy: {accuracy:.4f}")
-print("Classification Report:")
-print(classification_report(y_test, y_pred))
+params = {'svm_model__kernel': ['rbf','linear','sigmoid','poly'],
+    'svm_model__C': [1,1e2,1e3,1e4,1e5,1e6],
+    'svm_model__gamma': [1]}
 
-if USE_PCA:
+    
+grid = GridSearchCV(model, param_grid=params, refit=True, verbose=2, cv=5, n_jobs=-1)
+grid.fit(x_train, y_train)
+print(f"best accuracy: {grid.best_score_:.4f}")
+print(f"best parameters: {grid.best_params_}")
+results_df = pd.DataFrame(grid.cv_results_)
+heatmap_data = results_df
+pivot_table = heatmap_data.pivot(index='param_svm_model__C', columns='param_svm_model__kernel', values='mean_test_score')
 
-    pcn = model.named_steps['pca'].n_components
-    print(f"{pcn} components.")
-
-    pca = model.named_steps['pca']
-    
-    x_wavelengths = pd.to_numeric(x.columns)
-    plt.figure(figsize=(12, 3*pcn))
-    
-    for i in range(pcn):
-    
-        loadings = abs(pca.components_[i])  
-        plt.subplot(pcn, 1, i + 1)
-        plt.plot(x_wavelengths, loadings)
-        plt.ylabel('loading (abs value)')
-    
-    plt.xlabel('Wavelength (nm)')
-    plt.tight_layout()
-    plt.show()
-    
-
-
+plt.figure(figsize=(10, 8))
+sns.heatmap(pivot_table, annot=True, cmap='viridis', fmt=".3f")
+plt.ylabel('C Parameter')
+plt.xlabel('Kernel Type')
+plt.show()
