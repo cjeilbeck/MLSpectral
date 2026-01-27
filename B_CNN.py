@@ -11,6 +11,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
 from scipy.signal import savgol_filter
 from A_functions import haircut, multiregion,scaling,read_data,cudacheck,gradanal,multispectral, indicesmav,indicespaper
+import seaborn as sns
 plt.rcParams.update({'font.size': 14})
 
 DIAGNOSTICS=False
@@ -30,22 +31,22 @@ MULTIREGION = False
 centers = [560,650, 730,860]
 width = [32,32,32,26]
 
-INDICES = False
+INDICES = True
 if INDICES:
     HAIRCUT = False
     USE_SAVGOL = False
     MULTIREGION = False
 
 
-neurons1=8
-neurons2=16
+neurons1=64
+neurons2=128
 kernel1=3
 kernel2=3  #convolutional kernels
 poolkernel=2 #pooling kernel
 noisefactor=0
-dropprob=0.2 #dropout layer    might be unneccesary
-epochs=500
-lr=0.001
+dropprob=0.1 #dropout layer    might be unneccesary
+epochs=150
+lr=0.01
 seed = 42
 test_sizeinput = 0.2
 torch.manual_seed(seed)
@@ -116,14 +117,27 @@ model = model.to(device)
 optimizer = optim.Adam(model.parameters(), lr=lr)
 lossfunc = nn.CrossEntropyLoss()
 
+train_losses = []
+val_losses = []
+
 for epoch in range(epochs):
-    model.train()
+   
+    model.train() 
     optimizer.zero_grad()
     outputs = model(x_traint)
     loss = lossfunc(outputs, y_traint)
     loss.backward()
     optimizer.step()
-    print(epoch) if epoch%10 == 0 else None
+    train_losses.append(loss.item())
+    model.eval()   
+    with torch.no_grad(): 
+        val_outputs = model(x_testt)
+        val_loss = lossfunc(val_outputs, y_testt)
+        val_losses.append(val_loss.item())
+
+        
+    if epoch%10 == 0:
+        print(epoch)
 
 noise = torch.randn_like(x_testt)*noisefactor #gaussian noise
 x_testn = x_testt + noise
@@ -132,6 +146,10 @@ model.eval()
 with torch.no_grad():
     test_outputs = model(x_testn)
     _, y_pred = torch.max(test_outputs, 1)
+        
+    #entropy
+    probs = torch.softmax(test_outputs, 1)
+    entropy = -torch.sum(probs * torch.log2(probs + 1e-9), dim=1).cpu().numpy()
 
 y_pred = y_pred.cpu()
 y_testt = y_testt.cpu()
@@ -141,6 +159,8 @@ y_testnp = y_testt.numpy()
 
 predlabels = labelencoder.inverse_transform(y_prednp)
 testlabels = labelencoder.inverse_transform(y_testnp)
+
+entropyfile = pd.DataFrame({'Entropy': entropy,'Class': testlabels})
 
 accuracy = accuracy_score(testlabels, predlabels)
 print(f"Accuracy: {accuracy:.6f}")
@@ -172,3 +192,23 @@ if GRADANALYSIS:
         plt.xlabel("Wavelength (nm)")
         plt.ylabel("Mean Absolute Attribution")
         plt.show()
+
+plt.figure(figsize=(10, 5))
+plt.plot(train_losses, label='Training Loss',color='blue')
+plt.plot(val_losses, label='Validation Loss', color='orange')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(8, 5))
+plt.hist(entropy, bins=10, color='orange', edgecolor='black', alpha=0.7)
+plt.xlabel('Entropy')
+plt.ylabel('Count')
+plt.show()
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(x='Class', y='Entropy', data=entropyfile, palette="rocket")
+plt.xticks(rotation=45)
+plt.ylabel('Entropy')
+plt.show()

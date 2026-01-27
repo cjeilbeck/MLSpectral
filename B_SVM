@@ -15,9 +15,9 @@ def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
 
 USE_SCALING = True
-USE_PCA = True
-USE_SAVGOL = True
-HAIRCUT = True 
+USE_PCA = False
+USE_SAVGOL = False
+HAIRCUT = False 
 z = 42  # Seed
 comp = 3 # PCA components
 left= 200
@@ -29,10 +29,10 @@ MULTIREGION = False
 centers = [560,650, 730,860]  
 width = [32,32,32,26]
 
-INDICES = False # does not work for SVM yet will figure it out
+INDICES = True # does not work for SVM yet will figure it out
 
 KERNEL = 'rbf' #try 'linear', 'poly', 'rbf', 'sigmoid'   linear performs best on spectral, rbf maybe multispectral
-C = 1000        # regularization
+C = 100000       # regularization
 GAMMA = 1e-4 # kernel coefficient 
 
 x,y=read_data("CSVfiles/datacalibrated.csv")

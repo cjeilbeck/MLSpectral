@@ -19,7 +19,7 @@ seed = 42     # Seed
 comp = 6    # PCA components
 
 KERNEL = 'linear' #try 'linear', 'poly', 'rbf', 'sigmoid' 
-Cs = 1,10,100,1000,10000       
+Cs = 10     
 GAMMA = 1e-4
 
 #3648 wavelength values for reference, 345 - 1038nm
