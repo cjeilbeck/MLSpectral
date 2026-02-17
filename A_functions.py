@@ -222,3 +222,6 @@ def indicesmav(x):   #assuming mavic 3M
     ids['NDRE']= (M(860, width=26)-M(730))/(M(860, width=26)+M(730))
  
     return pd.DataFrame(ids, index=x.index) 
+
+
+ 
