@@ -30,7 +30,11 @@ MULTIREGION = False
 centers = [560,650, 730,860]  
 width = [32,32,32,26]
 
-INDICES = False # does not work for SVM yet will figure it out
+INDICES = True
+
+if INDICES:
+    HAIRCUT = False
+    USE_SAVGOL = False
 
 KERNEL = 'linear' #try 'linear', 'poly', 'rbf', 'sigmoid'   linear performs best on spectral, rbf maybe multispectral
 C = 1.0        # regularization
@@ -63,8 +67,8 @@ model = Pipeline(pipeline_steps)
 
 
 params = {'svm_model__kernel': ['rbf','linear','sigmoid','poly'],
-    'svm_model__C': [1,1e2,1e3,1e4,1e5,1e6],
-    'svm_model__gamma': [1]}
+    'svm_model__C': [1,10,1e2,1e3,1e4],
+    'svm_model__gamma': [1,0.1,0.001,0.0001,'scale']}
 
     
 grid = GridSearchCV(model, param_grid=params, refit=True, verbose=2, cv=5, n_jobs=-1)
@@ -80,3 +84,7 @@ sns.heatmap(pivot_table, annot=True, cmap='viridis', fmt=".3f")
 plt.ylabel('C Parameter')
 plt.xlabel('Kernel Type')
 plt.show()
+
+#best parameters: {'svm_model__C': 1, 'svm_model__gamma': 1, 'svm_model__kernel': 'linear'} for NORMAL
+#best parameters: {'svm_model__C': 1000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'} for INDICES
+
