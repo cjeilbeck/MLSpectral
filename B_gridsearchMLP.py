@@ -7,34 +7,64 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
 import pandas as pd
 from skorch import NeuralNetClassifier
-from A_functions import read_data, indicesmav
+from A_functions import read_data, indicesmav, indicescustomMLP, haircut 
 from sklearn.preprocessing import FunctionTransformer
 from scipy.signal import savgol_filter
-from A_functions import read_data, indicesmav, haircut
+from skorch.callbacks import EarlyStopping
+import pandas as pd
 
 def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
 
 HAIRCUT = True
 left, right = 200, 900
-INDICES = False
+INDICES = True
 SAVGOL=True
+CUSTOM = False 
+
+#typesofdatasetup
+GUMCOMB = False
+OAKONLY = True
 
 if INDICES:
     HAIRCUT = False
     SAVGOL = False
 
+if CUSTOM:
+    INDICES = False
+    HAIRCUT = False
+    SAVGOL = False
+
+import random
+import os
+
 seed = 42
-torch.manual_seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+random.seed(seed)
 np.random.seed(seed)
+torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 x, y = read_data("CSVfiles/datacalibrated.csv")
+
+if GUMCOMB:
+    y = y.replace(['Gum_young', 'Gum_old'], 'Gum')
+    y = y.replace(['Pine', 'Oakcork'], 'Other')
+
+if OAKONLY:
+    y = y.replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
 
 if HAIRCUT:
     x = haircut(x, left, right)
 if INDICES:
     x = indicesmav(x)
+if CUSTOM:
+    x = indicescustomMLP(x)
 
 
 labelencoder = LabelEncoder()
@@ -56,7 +86,23 @@ class Brad(nn.Module):
     def forward(self, x):
         return self.layers(x)
 
-net = NeuralNetClassifier(module=Brad,module__input_N=idim,module__classes_N=odim,criterion=nn.CrossEntropyLoss,optimizer=optim.AdamW,verbose=0)
+
+patience = 40
+
+early_stopping = EarlyStopping(
+    monitor='valid_loss', 
+    patience=patience,          
+    threshold=0.0001,     # Min imrpov
+    lower_is_better=True)
+
+net = NeuralNetClassifier(module=Brad,module__input_N=idim,module__classes_N=odim,criterion=nn.CrossEntropyLoss,optimizer=optim.AdamW,verbose=0,max_epochs=1000,callbacks=[early_stopping])
+
+def epochcount(estimator,x,y):
+    return len(estimator.named_steps['net'].history)
+
+scoring = {
+    'primary_score':'accuracy', 
+    'epochs': epochcount}
 
 pipeline_steps = []
 
@@ -66,21 +112,50 @@ pipeline_steps.append(('scaler', StandardScaler()))
 pipeline_steps.append(('net', net))
 pipe = Pipeline(pipeline_steps)
 
-params = {'net__module__layer_sizes': [(64, 32),(128,64),(32,16)],'net__lr': [0.01,0.001],'net__max_epochs': [100,300,600],'net__module__drop': [0.1,0.2]}
+params = {'net__module__layer_sizes': [(128,64),(64,32),(32,16)],
+          'net__lr': [0.01,0.001],'net__module__drop': [0.1,0.2]}
+
+#params = {'net__module__layer_sizes': [(128,64)],'net__lr': [0.01],'net__module__drop': [0.1]}
 
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-gs = GridSearchCV(pipe, params, refit=True, verbose=2, cv=cv, n_jobs=-1, scoring='accuracy')
+gs = GridSearchCV(pipe, params, refit='primary_score', verbose=2, cv=cv, n_jobs=1, scoring=scoring)
 gs.fit(x_train.astype(np.float32), y_train.astype(np.int64))
 
-print("-" * 10)
-print(f"Best Accuracy: {gs.best_score_:.6f}")
+print("x--" * 60)
+print(f"Best Accuracy: {gs.best_score_:.4f}")
 print(f"Best Parameters: {gs.best_params_}")
 
 
 results = pd.DataFrame(gs.cv_results_)
 pd.set_option('display.max_colwidth', None)
-results = results.sort_values(by='mean_test_score', ascending=False)
-print(results[['params', 'mean_test_score']])
+results = results.sort_values(by='mean_test_primary_score', ascending=False)
+print(results[['params', 'mean_test_primary_score', 'std_test_primary_score', 'mean_test_epochs', 'std_test_epochs']])
 
-#INDICES:    {'net__lr': 0.01, 'net__max_epochs': 600, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}         0.956667
-#SPECTRA     {'net__lr': 0.01, 'net__max_epochs': 300, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}         0.998333
+
+best_std = gs.cv_results_['std_test_primary_score'][gs.best_index_]
+best_error = best_std / np.sqrt(5)
+print(patience)
+print(f"Best Error: {best_error:.4f}")
+
+
+#SPECTRA (deterministic)                                                                                   params  mean_test_primary_score  std_test_primary_score  error             mean_test_epochs  std_test_epochs
+8    #{'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}                                        0.996667                0.004082     Error: 0.001826         290.2        95.461825
+
+
+#indexes
+#{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.946667                0.018708             121.0        62.858571
+
+
+
+#indexescustom 
+
+#{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.983333                0.010541              78.2        42.952998
+
+#indexes on gumcomb 
+
+1#{'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.973333                0.006236             130.8        15.276125
+
+
+#indexes on oakonly
+
+#   {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.950000                0.013944              81.2        65.967871

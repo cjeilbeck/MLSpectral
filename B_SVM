@@ -1,18 +1,17 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split,StratifiedKFold, cross_val_score, cross_validate
+from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.svm import SVC
 from sklearn.decomposition import PCA              
 from sklearn.pipeline import Pipeline            
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt  
 from scipy.signal import savgol_filter
-from sklearn.preprocessing import FunctionTransformer
-from A_functions import haircut,read_data,multispectral,indicesmav
+from A_functions import haircut,read_data,multispectral,indicesmav, indicescustomSVM
 import numpy as np
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import cross_val_score
 
+
+plt.rcParams.update({'font.size': 25})
 def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
 
@@ -22,31 +21,62 @@ USE_SAVGOL = True
 HAIRCUT = True 
 z = 42  
 comp = 4 
-left= 200
-right=900
+left= 206
+right=910
 
 test_sizeinput = 0.2
 MULTIREGION = False
 centers = [560,650, 730,860]  
 width = [32,32,32,26]
 
-INDICES = True 
+INDICES = False 
+CUSTOM = False
+
+OAKONLY = False
+GUMCOMB = False
+
 
 if INDICES:
     HAIRCUT = False
     USE_SAVGOL = False
 
-if INDICES:
+if CUSTOM:
+    INDICES = False
+    HAIRCUT = False
+    USE_SAVGOL = False
+
+if OAKONLY and INDICES:
     KERNEL = 'rbf' 
     C = 1000   
     GAMMA = 1
+
+elif GUMCOMB and INDICES:
+    KERNEL = 'rbf' 
+    C = 100.0   
+    GAMMA = 1
+
+elif INDICES:
+    KERNEL = 'rbf' 
+    C = 10000   
+    GAMMA = 1
+
+elif CUSTOM:
+    KERNEL = 'rbf' 
+    C = 10   
+    GAMMA = 0.1
+
 else:
     KERNEL = 'linear' 
-    C = 1.0 
+    C = 1 
     GAMMA = 1       
 
 x,y=read_data("CSVfiles/datacalibrated.csv")
 
+if GUMCOMB:
+    y = y.replace(['Gum_young', 'Gum_old'], 'Gum')
+    y = y.replace(['Pine', 'Oakcork'], 'Other')
+if OAKONLY:
+    y = y.replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
 if HAIRCUT:
     x = haircut(x,left,right)
     print(f"trimmed wav:",x.columns[0],x.columns[-1])
@@ -54,6 +84,9 @@ if MULTIREGION:
     x = multispectral(x, centers, width)
 if INDICES:
     x = indicesmav(x)
+if CUSTOM:
+    x = indicescustomSVM(x)
+
 
 x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=test_sizeinput,random_state=z,stratify=y)
 
@@ -72,10 +105,12 @@ pipeline_steps.append(('svm_model', SVC(kernel=KERNEL, C=C, gamma=GAMMA)))
 model = Pipeline(pipeline_steps)
 
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=z)
-cv_scores = cross_val_score(model, x_train, y_train, cv=skf)
-
+cv_results = cross_validate(model, x_train, y_train, cv=skf, return_estimator=True)
+cv_scores = cv_results['test_score']
 print(f"Cross-Validation Accuracy Scores: {cv_scores}")
 print(f"Mean CV Accuracy: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+
+cv_pipe = cv_results['estimator']
 
 model.fit(x_train, y_train)
 y_pred = model.predict(x_test)
@@ -84,6 +119,39 @@ accuracy = accuracy_score(y_test, y_pred)
 print(f"Testing Accuracy: {accuracy:.4f}")
 print("Classification Report:")
 print(classification_report(y_test, y_pred))
+
+cm = confusion_matrix(y_test, y_pred)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.named_steps['svm_model'].classes_)
+disp.plot(cmap=plt.cm.Blues)
+plt.show()
+
+"""
+if INDICES and OAKONLY==False and GUMCOMB==False and CUSTOM==False:
+    results_df = pd.DataFrame({'y_true': y_test,'y_pred_svm': y_pred})
+    results_df.to_csv('svm_predictions.csv', index=False)
+    print("Saved to CSV")
+"""
+
+if INDICES or CUSTOM:
+    print("meh")
+
+else:
+    weights = []
+    for pipeline in cv_pipe:
+        svm = pipeline.named_steps['svm_model']
+        weights.append(svm.coef_[0])
+    
+
+    meanw = np.mean(weights, axis=0)
+    ameanw = np.abs(meanw)
+    stdw = np.std(weights, axis=0)
+    plt.figure(figsize=(12, 6))
+    plt.plot(pd.to_numeric(x_train.columns), ameanw, color='red', linewidth=2)
+    plt.fill_between(pd.to_numeric(x_train.columns), ameanw - stdw, ameanw + stdw, color='red', alpha=0.2, label='±1 Std. Dev.')
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("Mean Absolute Weight")
+    plt.show()
+
 
 if USE_PCA:
     pca = model.named_steps['pca']

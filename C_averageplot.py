@@ -1,9 +1,9 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from A_functions import moving_average, indicesmav
+from A_functions import moving_average, indicesmav, problemtype, read_data
 
-plt.rcParams.update({'font.size': 14})
+plt.rcParams.update({'font.size': 25})
 SAVGOL = True
 
 MOV = False
@@ -17,26 +17,25 @@ if INDICES:
     SAVGOL = False
     MOV = False
 
+OAK = False
+BINARY = False
+GUMONLY = False
+ALL = True
+
+if OAK: problem = 'oak'
+if GUMONLY: problem = 'gum'
+if BINARY: problem = 'binary'
+if ALL: problem = 'all'
 filename = 'CSVfiles/datacalibrated.csv'
-
-file = pd.read_csv(filename, header=0)
-file = file.set_index(['leaf_type', 'sample_id'])
-file_avg = file.groupby(level='leaf_type').mean()
-
-
-name_mapping = {
-    'Oakcork': 'Oak',
-    'Gum_old': 'Old Gum',
-    'Gum_young': 'Young Gum',
-    'Pine': 'Pine'
-}
-
-file_avg = file_avg.rename(index=name_mapping)
-file = file.rename(index=name_mapping)
+x,y = read_data(filename)
+data = x.copy()
+data['leaf_type']=y
+data = problemtype(data, problem)
+data_avg = data.groupby('leaf_type').mean()
 
 plt.figure(figsize=(12, 7))
 
-wavelengths = [float(col_name) for col_name in file.columns]
+wavelengths = [float(col_name) for col_name in data_avg.columns]
 
 
 if HAIRCUT:
@@ -47,8 +46,8 @@ else:
 if INDICES:
     x_plot = indicesmav(x_plot)
 
-for leaf_type in file_avg.index:
-    chosenspectra = file_avg.loc[leaf_type]
+for leaf_type in data_avg.index:
+    chosenspectra = data_avg.loc[leaf_type]
     y_counts = chosenspectra.values
     
     if SAVGOL:
@@ -60,12 +59,9 @@ for leaf_type in file_avg.index:
     else:
         y_plot = y_counts
 
-
-    
     plt.plot(x_plot, y_plot, label=f"{leaf_type}")
 
-
 plt.xlabel("Wavelength (nm)")
-plt.ylabel("Corrected Reflectance")
+plt.ylabel("Reflectance")
 plt.legend()
 plt.show()

@@ -38,15 +38,15 @@ if INDICES:
     MULTIREGION = False
 
 
-neurons1=64
-neurons2=128
+neurons1=32
+neurons2=64
 kernel1=3
 kernel2=3  #convolutional kernels
 poolkernel=2 #pooling kernel
 noisefactor=0
-dropprob=0.1 #dropout layer    might be unneccesary
-epochs=150
-lr=0.01
+dropprob=0.2 #dropout layer    might be unneccesary
+epochs=600
+lr=0.001
 seed = 42
 test_sizeinput = 0.2
 torch.manual_seed(seed)

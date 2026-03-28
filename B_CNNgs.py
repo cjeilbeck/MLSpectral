@@ -28,7 +28,7 @@ np.random.seed(seed)
 torch.cuda.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
-
+print("---"*10)
 
 x, y = read_data("CSVfiles/datacalibrated.csv")
 
@@ -40,10 +40,7 @@ if INDICES:
 labelencoder = LabelEncoder()
 y_encoded = labelencoder.fit_transform(y)
 
-x_train, x_test, y_train, y_test = train_test_split(
-    x, y_encoded, test_size=0.2, random_state=seed, stratify=y_encoded
-)
-
+x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.2, random_state=seed, stratify=y_encoded)
 idim = x_train.shape[1]  # input_L
 odim = len(np.unique(y_encoded))  # classes_N
 
@@ -83,7 +80,8 @@ def apply_savgol(X):
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-net = NeuralNetClassifier(module=Oliver,module__input_L=idim,module__classes_N=odim,criterion=nn.CrossEntropyLoss,optimizer=optim.Adam,device=device,verbose=0)
+net = NeuralNetClassifier(module=Oliver,module__input_L=idim,module__classes_N=odim,
+                    criterion=nn.CrossEntropyLoss,optimizer=optim.Adam,device=device,verbose=0)
 
 pipeline_steps = []
 if USE_SAVGOL:
@@ -103,10 +101,9 @@ gs = GridSearchCV(pipe, params, refit=True, verbose=2, cv=cv, n_jobs=1, scoring=
 
 gs.fit(x_train.astype(np.float32), y_train.astype(np.int64))
 
-print("-" * 20)
 print(f"Best Accuracy: {gs.best_score_:.6f}")
 print(f"Best Parameters: {gs.best_params_}")
-
+print("---"*10)
 results = pd.DataFrame(gs.cv_results_)
 pd.set_option('display.max_colwidth', None)
 results = results.sort_values(by='mean_test_score', ascending=False)

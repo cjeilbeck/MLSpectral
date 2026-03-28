@@ -5,6 +5,13 @@ import torch
 from captum.attr import IntegratedGradients
 from scipy.signal import savgol_filter
 import math
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split
+from scipy.stats import gaussian_kde
+
+
 
 def haircut(x,left,right):   
     total_cols = x.shape[1]
@@ -145,8 +152,6 @@ def moving_average(input,window):
 
     return movingav
 
-
-
 def indicespaper(x):
 
     def M(w):
@@ -206,7 +211,7 @@ def indicespaper(x):
     return pd.DataFrame(ids, index=x.index)
 
 def indicesmav(x):   #assuming mavic 3M
-    def M(w, width=16):
+    def M(w, width=32):
         intensity = multispectral(x, [w], width=width, Dif=False)
         return intensity.iloc[:, 0]
 
@@ -214,14 +219,215 @@ def indicesmav(x):   #assuming mavic 3M
     ids['Green'] = M(560) 
     ids['Red'] = M(650)
     ids['Red-edge'] = M(730)
-    ids['NIR'] = M(860, width=26)
-    ids['NDVI']= (M(860, width=26)-M(650))/(M(860, width=26)+M(650))
-    ids['GNDVI']=(M(730)-M(560))/(M(730)+M(560))
-    ids['OSAVI']= (M(860, width=26)-M(650))/(M(860, width=26)+M(650)+0.16)
-    ids['LCI']= (M(860, width=26)-M(730))/(M(860, width=26)+M(650))
-    ids['NDRE']= (M(860, width=26)-M(730))/(M(860, width=26)+M(730))
+    ids['NIR'] = M(860, width=52)
+    ids['NDVI']= (M(860, width=52)-M(650))/(M(860, width=52)+M(650))
+    ids['GNDVI']=(M(860,width=52)-M(560))/(M(860,width=52)+M(560))
+    ids['OSAVI']= (M(860, width=52)-M(650))/(M(860, width=52)+M(650)+0.16)
+    ids['LCI']= (M(860, width=52)-M(730))/(M(860, width=52)+M(650))
+    ids['NDRE']= (M(860, width=52)-M(730))/(M(860, width=52)+M(730))
  
     return pd.DataFrame(ids, index=x.index) 
 
 
+def indices_single(x, index):
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+    
+    ids = {}
+    if index == 'NDVI':
+        ids['NDVI']= (M(860, width=52)-M(650))/(M(860, width=52)+M(650))
+    elif index == 'GNDVI':
+        ids['GNDVI']=(M(730)-M(560))/(M(730)+M(560))
+    elif index == 'OSAVI':
+        ids['OSAVI']= (M(860, width=52)-M(650))/(M(860, width=52)+M(650)+0.16)
+    elif index == 'LCI':
+        ids['LCI']= (M(860, width=52)-M(730))/(M(860, width=52)+M(650))
+    elif index == 'NDRE':
+        ids['NDRE']= (M(860, width=52)-M(730))/(M(860, width=52)+M(730))
+    elif index == 'Green':
+        ids['Green'] = M(560)
+    elif index == 'Red':
+        ids['Red'] = M(650)
+    elif index == 'Red-edge':
+        ids['Red-edge'] = M(730)
+    elif index == 'NIR':
+        ids['NIR'] = M(860, width=26)
+    elif index == 'Total Intensity':
+        ids['Total Intensity']=M(640, width = 500)
+    
+    return pd.DataFrame(ids, index=x.index)
+    
+
+def indicescustomrf(x):  
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+    green = M(410)
+    red = M(560)  
+    re = M(676)  
+    nir = M(710)
+
+    ids = {}
+    
+    ids['Green'] = green
+    ids['Red'] = red
+    ids['Red-edge'] = re
+    ids['NIR'] = nir
+    ids['NDVI'] = (nir-red) / (nir+red)
+    ids['GNDVI'] = (nir -green) / (nir+ green)
+    ids['OSAVI'] = (nir-red) / (nir+red + 0.16)
+    ids['LCI'] = (nir-re) / (nir +red)
+    ids['NDRE'] = (nir-re) / (nir+re)
  
+    return pd.DataFrame(ids, index=x.index)
+
+def indicescustomMLP(x):  
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+    green = M(410)
+    red = M(485)  
+    re = M(650)  
+    nir = M(700)
+
+    ids = {}
+    
+    ids['Green'] = green
+    ids['Red'] = red
+    ids['Red-edge'] = re
+    ids['NIR'] = nir
+    ids['NDVI'] = (nir-red) / (nir+red)
+    ids['GNDVI'] = (nir -green) / (nir+ green)
+    ids['OSAVI'] = (nir-red) / (nir+red + 0.16)
+    ids['LCI'] = (nir-re) / (nir +red)
+    ids['NDRE'] = (nir-re) / (nir+re)
+ 
+    return pd.DataFrame(ids, index=x.index)
+
+def indicescustomSVM(x):   
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+    green = M(440)
+    red = M(560)  
+    re = M(675)  
+    nir = M(705)
+
+    ids = {}
+    
+    ids['Green'] = green
+    ids['Red'] = red
+    ids['Red-edge'] = re
+    ids['NIR'] = nir
+    ids['NDVI'] = (nir-red) / (nir+red)
+    ids['GNDVI'] = (nir -green) / (nir+ green)
+    ids['OSAVI'] = (nir-red) / (nir+red + 0.16)
+    ids['LCI'] = (nir-re) / (nir +red)
+    ids['NDRE'] = (nir-re) / (nir+re)
+ 
+    return pd.DataFrame(ids, index=x.index)
+
+
+def indexplot1D(file, index, thresholds, labels, ax, labelsize, legendsize, truelabels='leaf_type', testing=True):
+    
+    plot = file.copy()
+    min_x = plot[index].min()
+    max_x = plot[index].max()
+    bins = [min_x] + thresholds + [max_x]
+    print(bins)
+    plot['predicted'] = pd.cut(plot[index], bins=bins, labels=labels, ordered=False, include_lowest=True)
+
+    if testing:
+        t,test = train_test_split(plot, test_size=0.2, random_state=42, stratify = plot['leaf_type'])
+        acc = accuracy_score(test['predicted'], test[truelabels])
+        print(f"accuracy:{acc:.4f}")
+        print(classification_report(test['predicted'], test[truelabels]))
+
+    fig = ax.get_figure()
+    sns.histplot(data=plot, x=index, hue='leaf_type', kde=True, palette='Set2',ax=ax)
+
+    colour_map = {
+        
+        'Young Gum': 'lightsalmon',
+        'Old Gum': 'lightblue',
+        'Oak': 'lightgreen',
+        'Pine': 'thistle',
+        'Gum': 'lightblue',
+        'Other': 'thistle'
+
+    }
+
+    currentylim = ax.get_ylim()[1]
+    for left,right, label in zip(bins[:-1], bins[1:] ,labels):
+        ax.axvspan(left,right,color = colour_map[label], alpha = 0.3)
+        mid = (left+right)/2
+        ax.text(mid, currentylim*0.95, label, ha="center", fontsize = labelsize, fontweight='bold', color='black', bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+
+    for thresh in thresholds:
+        ax.axvline(x=thresh, color='black', linestyle='--', linewidth=2, label=f'Bound:{thresh:.3f}')
+
+    ax.set_xlabel(index)
+    handles, llabels = ax.get_legend_handles_labels()
+    if testing:
+        ax.legend(handles=handles, fontsize = legendsize, title_fontsize = legendsize, title=f"Test Accuracy: {acc:.3f}", labels=llabels, bbox_to_anchor=(1.05, 1))
+
+    else:
+        ax.legend(handles=handles, labels=llabels, bbox_to_anchor=(1.05, 1))
+    fig.tight_layout()
+
+    ax.set_xlim(min_x - 0.05*((max_x-min_x)/2), max_x + 0.05*(max_x-min_x)/2) #optional padding but might have to remove for sake of space when 9 plots
+    
+  
+    return ax
+
+def problemtype(file, problemtype):
+    data = file.copy()
+    if problemtype == 'binary':
+        data['leaf_type'] = data['leaf_type'].replace(['Gum_young', 'Gum_old'], 'Gum')
+        data['leaf_type'] = data['leaf_type'].replace(['Pine', 'Oakcork'], 'Other')
+    elif problemtype == 'gum':
+        data = data[data['leaf_type'].isin(['Gum_young', 'Gum_old'])].copy()
+        data['leaf_type'] = data['leaf_type'].replace({'Gum_young': 'Young Gum', 'Gum_old': 'Old Gum'})
+    elif problemtype == 'all':
+        data['leaf_type'] = data['leaf_type'].replace({'Gum_young': 'Young Gum', 'Gum_old': 'Old Gum', 'Oakcork': 'Oak'})
+    elif problemtype == 'oak':
+        data['leaf_type'] = data['leaf_type'].replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
+        data['leaf_type'] = data['leaf_type'].replace(['Oakcork'], 'Oak')
+    return data
+
+
+def KDEpriorfunction(file, index, truelabels='leaf_type'):
+    classes = file[truelabels].unique()
+    nsamples = len(file[index])
+
+    kdes = {}
+    priors = {}
+
+    min = file[index].min()
+    max = file[index].max()
+
+    base = np.linspace(min,max,2000)
+
+    for c in classes:
+        data = file[file[truelabels]==c][index]
+        kdes[c] = gaussian_kde(data)
+        print(len(data))
+        print(nsamples)
+        priors[c] = len(data)/nsamples
+
+    prob = np.zeros((len(classes), len(base)))
+
+    for i, c in enumerate(classes):
+        if c in kdes:
+            prob[i,:] = kdes[c](base)*priors[c]
+        
+    best = np.argmax(prob, axis=0)
+    boundary = np.where(np.diff(best) !=0)[0]
+
+    boundaries = [base[idx] for idx in boundary] 
+    orderlabels = [classes[best[0]]]
+    for idx in boundary:
+        orderlabels.append(classes[best[idx+1]])
+
+    return boundaries, orderlabels

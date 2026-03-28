@@ -7,12 +7,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
 from scipy.signal import savgol_filter
-from A_functions import haircut,multiregion,read_data,scaling,gradanal, multispectral, indicesmav, indicespaper
+from A_functions import haircut,read_data,scaling,gradanal, indicesmav, indicescustomMLP, problemtype, indicespaper
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-plt.rcParams.update({'font.size': 14})
-
+plt.rcParams.update({'font.size': 25})
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import random
+import os
 
 USE_SCALING = True
 USE_PCA=False
@@ -20,41 +22,100 @@ ncomp = 4
 USE_SAVGOL = True
 smooth =51
 
+ADDGRAPHS = False
 
 HAIRCUT = True
-left = 200  #this changes accuracy a lot with minor tweaks
-right = 900
-
+left = 206  #this changes accuracy a lot with minor tweaks
+right = 910
+noisefactor = 0.0
 
 
 GRADANALYSIS = True
 
+#typesofdatasetup
+GUMCOMB = False
+OAKONLY = False
 
-INDICES = True
+
+INDICES = False
+CUSTOM = True
 
 if INDICES:
     HAIRCUT = False
     USE_SAVGOL = False
 
-neurons2=64
-neurons1=2*neurons2
+if CUSTOM:
+    INDICES = False
+    HAIRCUT = False
+    USE_SAVGOL = False
 
 
-epochs = 200
-noisefactor = 0.0
-lr=0.01
+
+
+
+    
+if INDICES and GUMCOMB:
+    lr=0.01
+    test_sizeinput = 0.2
+    drop=0.1
+    neurons2=32
+    neurons1=2*neurons2
+    epochs = 131
+
+elif INDICES and OAKONLY:
+    lr=0.01
+    test_sizeinput = 0.2
+    drop=0.2
+    neurons2=64
+    neurons1=2*neurons2
+    epochs = 81
+
+elif INDICES or CUSTOM:
+    
+    lr=0.01
+    test_sizeinput = 0.2
+    drop=0.2
+    neurons2=64
+    neurons1=2*neurons2
+    if INDICES:
+        epochs = 121
+    if CUSTOM:
+        epochs = 78
+
+else:
+    epochs = 290
+    lr=0.001
+    test_sizeinput = 0.2
+    drop=0.1
+    neurons2=16
+    neurons1=2*neurons2
+
 seed = 42
-test_sizeinput = 0.2
-drop=0.2
-torch.manual_seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+random.seed(seed)
 np.random.seed(seed)
+torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 
 
 x,y=read_data("CSVfiles/datacalibrated.csv")
 
+if GUMCOMB:
+    y = y.replace(['Gum_young', 'Gum_old'], 'Gum')
+    y = y.replace(['Pine', 'Oakcork'], 'Other')
+
+if OAKONLY:
+    y = y.replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
 
 if INDICES:
-    x = indicesmav(x)
+    x = indicesmav(x)    
+if CUSTOM:
+    x = indicescustomMLP(x)
 if HAIRCUT:
     x = haircut(x,left, right)
     print(f"trimmed wav:",x.columns[0],x.columns[-1])
@@ -101,7 +162,7 @@ class Brad(nn.Module):
 
 
 model = Brad(idim, odim)
-optimizer = optim.AdamW(model.parameters(), lr=lr)
+optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
 lossfunc = nn.CrossEntropyLoss()
 
 
@@ -163,6 +224,16 @@ print(f"Accuracy: {accuracy:.6f}")
 print("Classification Report:")
 print(classification_report(testlabels, predlabels))
 
+cm = confusion_matrix(testlabels, predlabels)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labelencoder.classes_)
+disp.plot(cmap=plt.cm.Blues)
+
+'''
+if INDICES and OAKONLY==False and GUMCOMB==False and CUSTOM==False:
+    results_df = pd.DataFrame({'y_true': testlabels,'y_pred_mlp': predlabels})
+    results_df.to_csv('mlp_predictions.csv', index=False)
+    print("saved to CSV")
+'''
 
 if USE_PCA:
 
@@ -176,12 +247,12 @@ if USE_PCA:
 
 
 if GRADANALYSIS:
-    wav, smoothed_attr = gradanal(model,x,x_testt,y_testt,smooth,left,right,0,savgol=USE_SAVGOL,islabel=INDICES)
-    if INDICES:
+    wav, smoothed_attr = gradanal(model,x,x_testt,y_testt,smooth,left,right,0,savgol=USE_SAVGOL,islabel=INDICES or CUSTOM)
+    if INDICES or CUSTOM:
         plt.figure(figsize=(10, 5))
         plt.bar(wav, smoothed_attr, color='purple')
-        plt.xticks(rotation=90)
-        plt.xlabel("Wavelength (nm)")
+        #plt.xticks(rotation=90)
+        plt.xlabel("Index/Band")
         plt.ylabel("Mean Absolute Attribution")
         plt.show()
     else:
@@ -194,22 +265,23 @@ if GRADANALYSIS:
 
 plt.figure(figsize=(10, 5))
 plt.plot(train_losses, label='Training Loss', color='blue')
-plt.plot(val_losses, label='Validation Loss', color='orange')
+plt.plot(val_losses, label='Testing Loss', color='red')
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
 plt.show()
 
 
-plt.figure(figsize=(8, 5))
-plt.hist(entropy, bins=10, color='orange', edgecolor='black', alpha=0.7)
-plt.xlabel('Entropy')
-plt.ylabel('Count')
-plt.show()
+if ADDGRAPHS:
+    plt.figure(figsize=(8, 5))
+    plt.hist(entropy, bins=10, color='orange', edgecolor='black', alpha=0.7)
+    plt.xlabel('Entropy')
+    plt.ylabel('Count')
+    plt.show()
 
 
-plt.figure(figsize=(12, 6))
-sns.boxplot(x='Class', y='Entropy', data=entropyfile, palette="rocket")
-plt.xticks(rotation=45)
-plt.ylabel('Entropy')
-plt.show()
+    plt.figure(figsize=(12, 6))
+    sns.boxplot(x='Class', y='Entropy', data=entropyfile, palette="rocket",hue='Class',legend=False)
+    plt.xticks(rotation=45)
+    plt.ylabel('Entropy')
+    plt.show()

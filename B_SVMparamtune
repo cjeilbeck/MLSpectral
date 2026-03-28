@@ -1,19 +1,19 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.preprocessing import StandardScaler,FunctionTransformer
 from sklearn.svm import SVC
 from sklearn.decomposition import PCA              
 from sklearn.pipeline import Pipeline            
-from sklearn.metrics import accuracy_score, classification_report
 import matplotlib.pyplot as plt  
 from scipy.signal import savgol_filter
-from sklearn.preprocessing import FunctionTransformer
-from A_functions import haircut,read_data,multispectral,indicesmav
+from A_functions import haircut,read_data,indicesmav, indicescustomSVM
 import numpy as np
 import seaborn as sns
-from sklearn.model_selection import GridSearchCV
+
 def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
+import os
+import random
 
 USE_SCALING = True
 USE_PCA = False
@@ -25,14 +25,32 @@ left= 200
 right=900
 #3648 wavelength values for reference, 345 - 1038nm
 
+
+
+
+seed = 42
+os.environ['PYTHONHASHSEED'] = str(seed)
+random.seed(seed)
+np.random.seed(seed)
+
+
+
+
 test_sizeinput = 0.2
-MULTIREGION = False
-centers = [560,650, 730,860]  
-width = [32,32,32,26]
+
+GUMCOMB = False
+OAKONLY = True
+
 
 INDICES = True
+CUSTOM = False
 
 if INDICES:
+    HAIRCUT = False
+    USE_SAVGOL = False
+
+if CUSTOM:
+    INDICES = False
     HAIRCUT = False
     USE_SAVGOL = False
 
@@ -42,13 +60,25 @@ GAMMA = 'scale' # kernel coefficient
 
 x,y=read_data("CSVfiles/datacalibrated.csv")
 
+if GUMCOMB:
+    y = y.replace(['Gum_young', 'Gum_old'], 'Gum')
+    y = y.replace(['Pine', 'Oakcork'], 'Other')
+
+if OAKONLY:
+    y = y.replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
+
+
 if HAIRCUT:
     x = haircut(x,left,right)
     print(f"trimmed wav:",x.columns[0],x.columns[-1])
-if MULTIREGION:
-    x = multispectral(x, centers, width)
+
 if INDICES:
     x = indicesmav(x)
+if CUSTOM:
+    x = indicescustomSVM(x)
+
+
+
 x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=test_sizeinput,random_state=z,stratify=y)
 
 pipeline_steps = []
@@ -66,16 +96,24 @@ pipeline_steps.append(('svm_model', SVC(kernel=KERNEL, C=C, gamma=GAMMA)))
 model = Pipeline(pipeline_steps)
 
 
-params = {'svm_model__kernel': ['rbf','linear','sigmoid','poly'],
-    'svm_model__C': [1,10,1e2,1e3,1e4],
-    'svm_model__gamma': [1,0.1,0.001,0.0001,'scale']}
+params = {'svm_model__kernel': ['rbf','linear'],'svm_model__C': [1,10,1e2,1e3,1e4],'svm_model__gamma': [1,0.1,0.001,0.0001,'scale']}
 
-    
-grid = GridSearchCV(model, param_grid=params, refit=True, verbose=2, cv=5, n_jobs=-1)
+
+
+
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=z)
+grid = GridSearchCV(model, param_grid=params, refit=True, verbose=2, cv=skf, n_jobs=-1)
 grid.fit(x_train, y_train)
 print(f"best accuracy: {grid.best_score_:.4f}")
 print(f"best parameters: {grid.best_params_}")
 results_df = pd.DataFrame(grid.cv_results_)
+
+
+
+pd.set_option('display.max_colwidth', None)
+results = results_df.sort_values(by='mean_test_score', ascending=False)
+print(results[['params', 'mean_test_score', 'std_test_score']])
+
 heatmap_data = results_df
 pivot_table = heatmap_data.pivot(index='param_svm_model__C', columns='param_svm_model__kernel', values='mean_test_score')
 
@@ -85,6 +123,16 @@ plt.ylabel('C Parameter')
 plt.xlabel('Kernel Type')
 plt.show()
 
-#best parameters: {'svm_model__C': 1, 'svm_model__gamma': 1, 'svm_model__kernel': 'linear'} for NORMAL
-#best parameters: {'svm_model__C': 1000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'} for INDICES
 
+
+
+#best parameters: {'svm_model__C': 1, 'svm_model__gamma': 1, 'svm_model__kernel': 'linear'} for NORMAL
+#best parameters: {'svm_model__C': 10000, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'} for INDICES
+
+#{'svm_model__C': 10, 'svm_model__gamma': 0.1, 'svm_model__kernel': 'rbf'}         0.990000        0.009718 for CUSTOM INDEXES
+
+
+#{'svm_model__C': 100.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'}         0.973333        0.011055 for gumCOMB
+
+
+#30            {'svm_model__C': 1000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'}         0.963333        0.012472  for OAKONLY

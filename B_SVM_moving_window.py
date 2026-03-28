@@ -1,15 +1,14 @@
 import pandas as pd
 import numpy as np 
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from sklearn.preprocessing import FunctionTransformer
-from A_functions import read_data,multiregion, multispectral
-from sklearn.model_selection import StratifiedKFold, cross_val_score
+from A_functions import read_data, multispectral 
+
 def apply_savgol(x):  
     return savgol_filter(x, window_length=11,polyorder=3,axis=1)
 
