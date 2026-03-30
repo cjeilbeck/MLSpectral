@@ -7,7 +7,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
 import pandas as pd
 from skorch import NeuralNetClassifier
-from A_functions import read_data, indicesmav, indicescustomMLP, haircut 
+from A_functions import read_data, indicesmav, indicescustomMLP, haircut, problemtype
 from sklearn.preprocessing import FunctionTransformer
 from scipy.signal import savgol_filter
 from skorch.callbacks import EarlyStopping
@@ -17,14 +17,20 @@ def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
 
 HAIRCUT = True
-left, right = 200, 900
+left, right = 206, 910
 INDICES = True
 SAVGOL=True
 CUSTOM = False 
 
 #typesofdatasetup
 GUMCOMB = False
-OAKONLY = True
+OAKONLY = False
+if GUMCOMB: 
+    problem = 'binary'
+elif OAKONLY: 
+    problem = 'oak'
+else: 
+    problem = 'all'
 
 if INDICES:
     HAIRCUT = False
@@ -50,14 +56,10 @@ if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = False
 
 
-x, y = read_data("CSVfiles/datacalibrated.csv")
-
-if GUMCOMB:
-    y = y.replace(['Gum_young', 'Gum_old'], 'Gum')
-    y = y.replace(['Pine', 'Oakcork'], 'Other')
-
-if OAKONLY:
-    y = y.replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
+data = pd.read_csv("CSVfiles/datacalibrated.csv")
+data = problemtype(data, problem)
+y = data['leaf_type']
+x = data.drop(columns=['leaf_type','sample_id'])
 
 if HAIRCUT:
     x = haircut(x, left, right)
@@ -139,21 +141,27 @@ print(f"Best Error: {best_error:.4f}")
 
 
 #SPECTRA (deterministic)                                                                                   params  mean_test_primary_score  std_test_primary_score  error             mean_test_epochs  std_test_epochs
-8    #{'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}                                        0.996667                0.004082     Error: 0.001826         290.2        95.461825
+7    #{'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.991667                0.010541             246.0        79.701945
+8    #{'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}                 0.991667                0.012910             227.8        64.857999
 
 
 #indexes
-#{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.946667                0.018708             121.0        62.858571
+0    #{'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.938333                0.022111              55.6         7.964923
+3    #{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.938333                0.017951              55.4         7.391887
 
 
 
 #indexescustom 
 
-#{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.983333                0.010541              78.2        42.952998
+#0    {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.986667                0.008498              79.2        32.145917
+
+
+
 
 #indexes on gumcomb 
 
-1#{'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.973333                0.006236             130.8        15.276125
+1    # {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.973333                0.006236             130.8        15.276125
+3    #{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.973333                0.013333             118.0        34.047026
 
 
 #indexes on oakonly
