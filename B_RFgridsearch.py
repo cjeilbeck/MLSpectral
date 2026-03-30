@@ -4,11 +4,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.pipeline import Pipeline            
 from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,indicesmav, indicescustomrf
+from A_functions import haircut,read_data,indicesmav, indicescustomrf, problemtype
 import numpy as np
 import os
 import random
-import torch
+
 
 def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
@@ -22,15 +22,9 @@ z = 42
 os.environ['PYTHONHASHSEED'] = str(z)
 random.seed(z)
 np.random.seed(z)
-torch.manual_seed(z)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed(z)
-    torch.cuda.manual_seed_all(z)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
-left= 200
-right=900
+left= 206
+right=910
 
 test_sizeinput = 0.2
 
@@ -39,23 +33,27 @@ if INDICES:
     HAIRCUT = False
     USE_SAVGOL = False
 
-CUSTOMRF = True
+CUSTOMRF = False
 if CUSTOMRF:
     INDICES = False
     HAIRCUT = False
     USE_SAVGOL = False
 
-x,y=read_data("CSVfiles/datacalibrated.csv")
+data=pd.read_csv("CSVfiles/datacalibrated.csv")
 
 GUMCOMB = False
-OAKONLY = False
+OAKONLY = True
 
 if GUMCOMB:
-    y = y.replace(['Gum_young', 'Gum_old'], 'Gum')
-    y = y.replace(['Pine', 'Oakcork'], 'Other')
+    problem = 'binary'
+elif OAKONLY:
+    problem = 'oak'
+else:
+    problem = 'all'
 
-if OAKONLY:
-    y = y.replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
+data = problemtype(data, problem)
+y = data['leaf_type']
+x = data.drop(columns=['leaf_type','sample_id'])    
 
 if HAIRCUT:
     x = haircut(x,left,right)
@@ -100,3 +98,12 @@ print(f"Best Parameters: {grid_search.best_params_}")
 #Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'gini', 'rf_model__max_depth': 15, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 200} #INDEXGUMCOMB
 #Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'gini', 'rf_model__max_depth': 10, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 150} #INDEXESCUSTOM
 #Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 10, 'rf_model__max_features': 'log2', 'rf_model__min_samples_leaf': 1, 'rf_model__n_estimators': 150} FOR NORMAL
+
+
+
+#SEARCHAFTER
+#INDEXES
+#Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 15, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 200} INDEX
+#Best Parameters: {'rf_model__class_weight': None, 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 10, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 150} HYPER
+#Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'gini', 'rf_model__max_depth': 15, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 200} GUMCOMB
+#Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 15, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 150} OAKONLY

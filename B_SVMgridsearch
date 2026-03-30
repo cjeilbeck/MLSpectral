@@ -6,7 +6,7 @@ from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline            
 import matplotlib.pyplot as plt  
 from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,indicesmav, indicescustomSVM
+from A_functions import haircut,read_data,indicesmav, indicescustomSVM,problemtype
 import numpy as np
 import seaborn as sns
 
@@ -21,10 +21,9 @@ USE_SAVGOL = True
 HAIRCUT = True 
 z = 42  # Seed
 comp = 4 # PCA components
-left= 200
-right=900
+left= 206
+right=910
 #3648 wavelength values for reference, 345 - 1038nm
-
 
 
 
@@ -58,14 +57,19 @@ KERNEL = 'linear' #try 'linear', 'poly', 'rbf', 'sigmoid'   linear performs best
 C = 1.0        # regularization
 GAMMA = 'scale' # kernel coefficient 
 
-x,y=read_data("CSVfiles/datacalibrated.csv")
+data=pd.read_csv("CSVfiles/datacalibrated.csv")
 
 if GUMCOMB:
-    y = y.replace(['Gum_young', 'Gum_old'], 'Gum')
-    y = y.replace(['Pine', 'Oakcork'], 'Other')
+    problem = 'binary'
+elif OAKONLY:
+    problem = 'oak'
+else:
+    problem = 'all'
 
-if OAKONLY:
-    y = y.replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
+data = problemtype(data, problem)
+y = data['leaf_type']
+x = data.drop(columns=['leaf_type','sample_id'])    
+
 
 
 if HAIRCUT:
@@ -136,3 +140,36 @@ plt.show()
 
 
 #30            {'svm_model__C': 1000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'}         0.963333        0.012472  for OAKONLY
+
+
+#REDONE
+
+#HYPERSPECTRAL
+"""
+                                                                                   params  mean_test_score  std_test_score
+36       {'svm_model__C': 1000.0, 'svm_model__gamma': 0.0001, 'svm_model__kernel': 'rbf'}         1.000000        0.000000
+26        {'svm_model__C': 100.0, 'svm_model__gamma': 0.0001, 'svm_model__kernel': 'rbf'}         1.000000        0.000000
+46      {'svm_model__C': 10000.0, 'svm_model__gamma': 0.0001, 'svm_model__kernel': 'rbf'}         1.000000        0.000000
+
+"""
+
+#INDICES
+
+"""
+42         {'svm_model__C': 10000.0, 'svm_model__gamma': 0.1, 'svm_model__kernel': 'rbf'}         0.938333        0.026667
+"""
+
+
+#BINARY
+
+"""
+20             {'svm_model__C': 100.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'}         0.973333        0.011055
+"""
+
+
+#OAKONLY
+
+"""
+30            {'svm_model__C': 1000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'}         0.963333        0.012472
+40           {'svm_model__C': 10000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'}         0.963333        0.012472
+"""

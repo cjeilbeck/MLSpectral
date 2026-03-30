@@ -7,8 +7,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt  
 from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,multispectral,indicesmav, indicescustomSVM
+from A_functions import haircut,read_data,multispectral,indicesmav, indicescustomSVM,problemtype
 import numpy as np
+import os
+import random
 
 
 plt.rcParams.update({'font.size': 25})
@@ -19,7 +21,12 @@ USE_SCALING = True
 USE_PCA = False
 USE_SAVGOL = True
 HAIRCUT = True 
-z = 42  
+z= 42
+
+os.environ['PYTHONHASHSEED'] = str(z)
+random.seed(z)
+np.random.seed(z)  
+
 comp = 4 
 left= 206
 right=910
@@ -58,7 +65,7 @@ elif GUMCOMB and INDICES:
 elif INDICES:
     KERNEL = 'rbf' 
     C = 10000   
-    GAMMA = 1
+    GAMMA = 0.1
 
 elif CUSTOM:
     KERNEL = 'rbf' 
@@ -66,20 +73,31 @@ elif CUSTOM:
     GAMMA = 0.1
 
 else:
-    KERNEL = 'linear' 
-    C = 1 
-    GAMMA = 1       
+    KERNEL = 'rbf' 
+    C = 100 
+    GAMMA = 0.0001       
 
-x,y=read_data("CSVfiles/datacalibrated.csv")
+data=pd.read_csv("CSVfiles/datacalibrated.csv")
 
 if GUMCOMB:
-    y = y.replace(['Gum_young', 'Gum_old'], 'Gum')
-    y = y.replace(['Pine', 'Oakcork'], 'Other')
-if OAKONLY:
-    y = y.replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
+    problem = 'binary'
+elif OAKONLY:
+    problem = 'oak'
+else:
+    problem = 'all'
+
+data = problemtype(data, problem)
+y = data['leaf_type']
+x = data.drop(columns=['leaf_type','sample_id'])    
+
+
+
+
 if HAIRCUT:
     x = haircut(x,left,right)
     print(f"trimmed wav:",x.columns[0],x.columns[-1])
+
+
 if MULTIREGION:
     x = multispectral(x, centers, width)
 if INDICES:

@@ -6,9 +6,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt  
 from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,multispectral,indicesmav, indicescustomrf
+from A_functions import haircut,read_data,multispectral,indicesmav, indicescustomrf,problemtype
 import numpy as np
-
+import os
+import random
 
 plt.rcParams.update({'font.size': 25})
 def apply_savgol(x):
@@ -18,12 +19,14 @@ USE_SCALING = False
 USE_SAVGOL = True
 HAIRCUT = True 
 
-GUMCOMB = False
-OAKONLY = True
-z = 42
+z= 42
 
-left= 200
-right=900
+os.environ['PYTHONHASHSEED'] = str(z)
+random.seed(z)
+np.random.seed(z)  
+
+left= 206
+right=910
 
 test_sizeinput = 0.2
 
@@ -40,14 +43,21 @@ if CUSTOMRF:
     HAIRCUT = False
     USE_SAVGOL = False
 
-x,y=read_data("CSVfiles/datacalibrated.csv")
+data=pd.read_csv("CSVfiles/datacalibrated.csv")
+
+GUMCOMB = False
+OAKONLY = False
 
 if GUMCOMB:
-    y = y.replace(['Gum_young', 'Gum_old'], 'Gum')
-    y = y.replace(['Pine', 'Oakcork'], 'Other')
+    problem = 'binary'
+elif OAKONLY:
+    problem = 'oak'
+else:
+    problem = 'all'
 
-if OAKONLY:
-    y = y.replace(['Gum_young', 'Gum_old','Pine'], 'Other')
+data = problemtype(data, problem)
+y = data['leaf_type']
+x = data.drop(columns=['leaf_type','sample_id'])    
 
 if HAIRCUT:
     x = haircut(x,left,right)
@@ -69,15 +79,17 @@ if USE_SCALING:
 TEST=False
 
 if TEST:
-    rf = RandomForestClassifier(n_estimators=150,random_state=z)
-if INDICES and TEST==False:
-    rf = RandomForestClassifier(n_estimators=50,criterion='gini',max_depth=15,min_samples_leaf=1,max_features='sqrt',class_weight=None,random_state=z)
-elif CUSTOMRF and TEST==False:
-    rf = RandomForestClassifier(n_estimators=150,criterion='gini',max_depth=10,min_samples_leaf=1,max_features='sqrt',class_weight='balanced',random_state=z)
+    rf = RandomForestClassifier(n_estimators=150, random_state=z)
 elif INDICES and GUMCOMB and TEST==False:
-    rf = RandomForestClassifier(n_estimators=200,criterion='gini',max_depth=15,min_samples_leaf=1,max_features='sqrt',class_weight='balanced',random_state=z)
+    rf = RandomForestClassifier(n_estimators=200,criterion='gini',max_depth=15,max_features='sqrt',class_weight='balanced',random_state=z)
+elif INDICES and TEST==False:
+    rf = RandomForestClassifier(n_estimators=200, criterion='log_loss',max_depth=15,max_features='sqrt',class_weight='balanced',random_state=z)
+elif CUSTOMRF and TEST==False:
+    rf = RandomForestClassifier(n_estimators=150,criterion='gini',max_depth=10,max_features='sqrt',class_weight='balanced',random_state=z)
+elif OAKONLY and TEST==False:
+    rf = RandomForestClassifier(n_estimators=150,criterion='log_loss', max_depth=15, max_features='sqrt',class_weight='balanced',random_state=z)
 else:
-    rf = RandomForestClassifier(n_estimators=150,criterion='log_loss',max_depth=10,min_samples_leaf=1,max_features='log2',class_weight='balanced',random_state=z)
+    rf = RandomForestClassifier(n_estimators=150,criterion='log_loss',max_depth=10,max_features='sqrt',class_weight=None,random_state=z)
 
 
 
