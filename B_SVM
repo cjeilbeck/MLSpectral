@@ -11,7 +11,8 @@ from A_functions import haircut,read_data,multispectral,indicesmav, indicescusto
 import numpy as np
 import os
 import random
-
+import seaborn as sns
+from scipy.stats import entropy
 
 plt.rcParams.update({'font.size': 25})
 def apply_savgol(x):
@@ -21,6 +22,7 @@ USE_SCALING = True
 USE_PCA = False
 USE_SAVGOL = True
 HAIRCUT = True 
+CUSTOMBANDPLOTS = False
 z= 42
 
 os.environ['PYTHONHASHSEED'] = str(z)
@@ -28,8 +30,8 @@ random.seed(z)
 np.random.seed(z)  
 
 comp = 4 
-left= 206
-right=910
+left= 200
+right=900
 
 test_sizeinput = 0.2
 MULTIREGION = False
@@ -42,6 +44,7 @@ CUSTOM = False
 OAKONLY = False
 GUMCOMB = False
 
+LINEAR = True
 
 if INDICES:
     HAIRCUT = False
@@ -72,6 +75,10 @@ elif CUSTOM:
     C = 10   
     GAMMA = 0.1
 
+elif LINEAR:
+    KERNEL = 'linear' 
+    C = 1      
+    GAMMA = 'scale'
 else:
     KERNEL = 'rbf' 
     C = 100 
@@ -119,7 +126,7 @@ if USE_SCALING:
 if USE_PCA:
     pipeline_steps.append(('pca', PCA(n_components=comp)))
 
-pipeline_steps.append(('svm_model', SVC(kernel=KERNEL, C=C, gamma=GAMMA)))
+pipeline_steps.append(('svm_model', SVC(kernel=KERNEL, C=C, gamma=GAMMA, probability=True, random_state=z)))
 model = Pipeline(pipeline_steps)
 
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=z)
@@ -150,24 +157,36 @@ if INDICES and OAKONLY==False and GUMCOMB==False and CUSTOM==False:
     print("Saved to CSV")
 """
 
-if INDICES or CUSTOM:
-    print("meh")
 
-else:
+if LINEAR:
     weights = []
     for pipeline in cv_pipe:
         svm = pipeline.named_steps['svm_model']
         weights.append(svm.coef_[0])
     
 
-    meanw = np.mean(weights, axis=0)
-    ameanw = np.abs(meanw)
-    stdw = np.std(weights, axis=0)
+    ameanw = np.mean(np.abs(weights), axis=0)
+
+    stdw = np.std(np.abs(weights), axis=0)
+
+
+    
+    centres=[445,816,665,720]
+    widths =[32,32,32,32]
+
     plt.figure(figsize=(12, 6))
     plt.plot(pd.to_numeric(x_train.columns), ameanw, color='red', linewidth=2)
+
+    if CUSTOMBANDPLOTS:
+        for i, (c, w) in enumerate(zip(centres, widths)):
+            plt.axvspan(c-w/2, c+w/2, alpha=0.25, color='steelblue', label=f'Centre: {c}nm')
+    
+        plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.fill_between(pd.to_numeric(x_train.columns), ameanw - stdw, ameanw + stdw, color='red', alpha=0.2, label='±1 Std. Dev.')
+   
     plt.xlabel("Wavelength (nm)")
     plt.ylabel("Mean Absolute Weight")
+   
     plt.show()
 
 
@@ -188,3 +207,11 @@ if USE_PCA:
         plt.show()
 
 
+probs = model.named_steps['svm_model'].predict_proba(x_test)
+shentropy = entropy(probs, axis=1,base=2)
+entropyfile = pd.DataFrame({'Class': y_test,'Entropy': shentropy})
+plt.figure(figsize=(12, 6))
+sns.boxplot(x='Class', y='Entropy', data=entropyfile, palette="rocket",hue='Class',legend=False)
+
+plt.ylabel('Entropy')
+plt.show()

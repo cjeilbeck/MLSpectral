@@ -24,7 +24,7 @@ CUSTOM = False
 
 #typesofdatasetup
 GUMCOMB = False
-OAKONLY = False
+OAKONLY = True
 if GUMCOMB: 
     problem = 'binary'
 elif OAKONLY: 
@@ -89,7 +89,7 @@ class Brad(nn.Module):
         return self.layers(x)
 
 
-patience = 40
+patience = 50
 
 early_stopping = EarlyStopping(
     monitor='valid_loss', 
@@ -139,8 +139,9 @@ best_error = best_std / np.sqrt(5)
 print(patience)
 print(f"Best Error: {best_error:.4f}")
 
+#patience = 40
 
-#SPECTRA (deterministic)                                                                                   params  mean_test_primary_score  std_test_primary_score  error             mean_test_epochs  std_test_epochs
+#SPECTRA (deterministic)                                                                 params  mean_test_primary_score  std_test_primary_score              mean_test_epochs  std_test_epochs
 7    #{'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.991667                0.010541             246.0        79.701945
 8    #{'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}                 0.991667                0.012910             227.8        64.857999
 
@@ -148,14 +149,6 @@ print(f"Best Error: {best_error:.4f}")
 #indexes
 0    #{'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.938333                0.022111              55.6         7.964923
 3    #{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.938333                0.017951              55.4         7.391887
-
-
-
-#indexescustom 
-
-#0    {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.986667                0.008498              79.2        32.145917
-
-
 
 
 #indexes on gumcomb 
@@ -167,3 +160,26 @@ print(f"Best Error: {best_error:.4f}")
 #indexes on oakonly
 
 #   {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.950000                0.013944              81.2        65.967871
+
+
+
+#PATIENCE = 50
+#spectra
+
+#  11   {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (32, 16)}                 0.995000                0.010000             327.0       138.977696
+# #  {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.993333                0.009718             198.0        44.890979
+
+#indexes  
+#0    {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.945000                0.023333              64.4         6.800000
+#     {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}                 0.945000                0.018708              99.8        32.492461
+
+#GUMCOMB
+
+#1     {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.973333                0.011055             174.4        93.941684
+#3    {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.973333                0.006236             109.4        36.702044
+
+
+#OAKONLY
+
+#3    {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.955000                0.015456             111.0        61.096645
+#0    {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.953333                0.012472              83.6        48.014998

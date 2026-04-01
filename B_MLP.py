@@ -7,12 +7,13 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
 from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,scaling,gradanal, indicesmav, indicescustomMLP, problemtype, indicespaper
+from A_functions import haircut,read_data,scaling,gradanal, indicesmav, indicescustomMLP, problemtype, indicespaper,indicescustom
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 plt.rcParams.update({'font.size': 25})
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from scipy.stats import entropy
 import random
 import os
 
@@ -24,6 +25,7 @@ smooth =51
 
 TESTGRAPHS = True
 CVGRAPHS = True
+CUSTOMBANDPLOTS = True
 
 HAIRCUT = True
 left = 206  #this changes accuracy a lot with minor tweaks
@@ -42,7 +44,7 @@ if OAKONLY: problem = 'oak'
 
 else: problem = 'all'
 
-INDICES = True
+INDICES = False
 CUSTOM = False
 
 if INDICES:
@@ -54,46 +56,88 @@ if CUSTOM:
     HAIRCUT = False
     USE_SAVGOL = False
 
-
+patience = 50
 
 test_sizeinput = 0.2
 
-    
-if INDICES and GUMCOMB:
-    lr=0.01
 
-    drop=0.1
-    neurons2=32
-    neurons1=2*neurons2
-    epochs = 131
+if patience ==40:
+    if INDICES and GUMCOMB:
+        lr=0.01
 
-elif INDICES and OAKONLY:
-    lr=0.01
+        drop=0.1
+        neurons2=32
+        neurons1=2*neurons2
+        epochs = 131
 
-    drop=0.2
-    neurons2=64
-    neurons1=2*neurons2
-    epochs = 81
+    elif INDICES and OAKONLY:
+        lr=0.01
 
-elif INDICES or CUSTOM:
-    
-    lr=0.01
-    neurons2=64
-    neurons1=2*neurons2
-    if INDICES:
-        epochs = 55
         drop=0.2
-    if CUSTOM:
-        epochs = 79
-        drop = 0.1
+        neurons2=64
+        neurons1=2*neurons2
+        epochs = 81
 
-else:
-    epochs = 228
-    lr=0.001
+    elif INDICES or CUSTOM:
+        
+        lr=0.01
+        neurons2=64
+        neurons1=2*neurons2
+        if INDICES:
+            epochs = 55
+            drop=0.2
+        if CUSTOM:
+            epochs = 79
+            drop = 0.1
 
-    drop=0.1
-    neurons2=16
-    neurons1=2*neurons2
+    else:
+        epochs = 228
+        lr=0.001
+
+        drop=0.1
+        neurons2=16
+        neurons1=2*neurons2
+
+
+if patience == 50:
+    if INDICES and GUMCOMB:
+        lr=0.01
+
+        drop=0.1
+        neurons2=32
+        neurons1=2*neurons2
+        epochs = 174
+
+    elif INDICES and OAKONLY:
+        lr=0.01
+
+        drop=0.2
+        neurons2=64
+        neurons1=2*neurons2
+        epochs = 111
+
+    elif INDICES:
+        
+        lr=0.01
+        neurons2=64
+        neurons1=2*neurons2
+        epochs = 64
+        drop=0.1
+
+    elif CUSTOM:
+        lr=0.01
+        neurons2=16
+        neurons1=2*neurons2
+        epochs = 50
+        drop=0.1
+
+    else:
+        epochs = 327
+        lr=0.001
+
+        drop=0.2
+        neurons2=16
+        neurons1=2*neurons2
 
 seed = 42
 os.environ['PYTHONHASHSEED'] = str(seed)
@@ -228,7 +272,8 @@ for fold, (train_idx, val_idx) in enumerate(skf.split(x_train, y_train)):
 
     #entropy
         probs = torch.softmax(test_outputs, 1)
-        entropy = -torch.sum(probs * torch.log2(probs + 1e-9), dim=1).numpy()
+        shentropy = entropy(probs.numpy(), base=2, axis=1)
+        #entropy = -torch.sum(probs * torch.log2(probs + 1e-9), dim=1).numpy()
 
 
     y_prednp = y_pred.numpy()
@@ -240,7 +285,7 @@ for fold, (train_idx, val_idx) in enumerate(skf.split(x_train, y_train)):
     fold_accuracies.append(foldacc)
     all_trainloss.append(train_losses)
     all_valloss.append(val_losses)
-    all_entropy.extend(entropy)
+    all_entropy.extend(shentropy)
     all_testlabels.extend(testlabels)
     all_predlabels.extend(predlabels)
 
@@ -275,7 +320,7 @@ if CVGRAPHS:
 
         if INDICES or CUSTOM:
             plt.figure(figsize=(10, 5))
-            plt.bar(wav, mean_attr, yerr=std_attr, color='purple', capsize=3, alpha=0.8)
+            plt.bar(wav, mean_attr, yerr=[np.zeros(len(std_attr)), std_attr], color='purple', capsize=10, alpha=0.8)
             plt.xlabel("Index/Band")
             plt.ylabel("Mean Absolute Attribution")
             plt.show()
@@ -283,6 +328,18 @@ if CVGRAPHS:
             wav = np.array(wav, dtype=float)
             plt.figure(figsize=(10, 5))
             plt.plot(wav, mean_attr, color='purple')
+
+            if CUSTOMBANDPLOTS:
+                centres=[410,450,665,720]
+                widths =[10,40,40,32]
+
+
+
+                for i, (c, w) in enumerate(zip(centres, widths)):
+                    plt.axvspan(c-w/2, c+w/2, alpha=0.25, color='steelblue', label=f'Centre: {c}nm')
+        
+                    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+ 
             plt.fill_between(wav, mean_attr - std_attr, mean_attr + std_attr, alpha=0.2, color='purple')
             plt.xlabel("Wavelength (nm)")
             plt.ylabel("Mean Absolute Attribution")
@@ -361,7 +418,7 @@ with torch.no_grad():
     _, y_predtest = torch.max(test_out, 1)
 
     probs = torch.softmax(test_out, 1)
-    entropy = -torch.sum(probs * torch.log2(probs + 1e-9), dim=1).numpy()
+    shentropy = entropy(probs.numpy(), base=2, axis=1)
 
 testpred_labels = labelencoder.inverse_transform(y_predtest.numpy())
 testtrue_labels = labelencoder.inverse_transform(y_testt.numpy())
@@ -378,7 +435,7 @@ disp.plot(cmap=plt.cm.Blues)
 plt.title("Confusion test set")
 plt.show()
 
-entropyfile = pd.DataFrame({'Entropy': entropy,'Class': testtrue_labels})
+entropyfile = pd.DataFrame({'Entropy': shentropy,'Class': testtrue_labels})
 '''
 if INDICES and OAKONLY==False and GUMCOMB==False and CUSTOM==False:
     results_df = pd.DataFrame({'y_true': testtrue_labels,'y_pred_mlp': testpred_labels})
@@ -413,7 +470,7 @@ if TESTGRAPHS:
     plt.show()
 
     plt.figure(figsize=(8, 5))
-    plt.hist(entropy, bins=10, color='orange', edgecolor='black', alpha=0.7)
+    plt.hist(shentropy, bins=10, color='orange', edgecolor='black', alpha=0.7)
     plt.xlabel('Entropy')
     plt.ylabel('Count')
     plt.show()

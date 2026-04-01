@@ -263,9 +263,9 @@ def indicescustomrf(x):
     def M(w, width=32):
         intensity = multispectral(x, [w], width=width, Dif=False)
         return intensity.iloc[:, 0]
-    green = M(410)
-    red = M(560)  
-    re = M(676)  
+    green = M(420)
+    red = M(555)  
+    re = M(675)  
     nir = M(710)
 
     ids = {}
@@ -310,9 +310,9 @@ def indicescustomSVM(x):
         intensity = multispectral(x, [w], width=width, Dif=False)
         return intensity.iloc[:, 0]
     green = M(440)
-    red = M(560)  
-    re = M(675)  
-    nir = M(705)
+    red = M(675)
+    re = M(720)
+    nir = M(820)
 
     ids = {}
     
@@ -328,6 +328,28 @@ def indicescustomSVM(x):
  
     return pd.DataFrame(ids, index=x.index)
 
+def indicescustom(x):   
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+    green = M(440)
+    red = M(675)
+    re = M(710)
+    nir = M(820)
+
+    ids = {}
+    
+    ids['Green'] = green
+    ids['Red'] = red
+    ids['Red-edge'] = re
+    ids['NIR'] = nir
+    ids['NDVI'] = (nir-red) / (nir+red)
+    ids['GNDVI'] = (nir -green) / (nir+ green)
+    ids['OSAVI'] = (nir-red) / (nir+red + 0.16)
+    ids['LCI'] = (nir-re) / (nir +red)
+    ids['NDRE'] = (nir-re) / (nir+re)
+ 
+    return pd.DataFrame(ids, index=x.index)
 
 def indexplot1D(file, index, thresholds, labels, ax, labelsize, legendsize, truelabels='leaf_type', testing=True):
     
@@ -389,14 +411,13 @@ def problemtype(file, problemtype):
     elif problemtype == 'gum':
         data = data[data['leaf_type'].isin(['Gum_young', 'Gum_old'])].copy()
         data['leaf_type'] = data['leaf_type'].replace({'Gum_young': 'Young Gum', 'Gum_old': 'Old Gum'})
-    elif problemtype == 'all':
-        data['leaf_type'] = data['leaf_type'].replace({'Gum_young': 'Young Gum', 'Gum_old': 'Old Gum', 'Oakcork': 'Oak'})
+
     elif problemtype == 'oak':
         data['leaf_type'] = data['leaf_type'].replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
         data['leaf_type'] = data['leaf_type'].replace(['Oakcork'], 'Oak')
     return data
 
-
+    
 def KDEpriorfunction(file, index, truelabels='leaf_type'):
     classes = file[truelabels].unique()
     nsamples = len(file[index])

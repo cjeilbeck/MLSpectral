@@ -65,3 +65,31 @@ plt.xlabel("Wavelength (nm)")
 plt.ylabel("Reflectance")
 plt.legend()
 plt.show()
+
+
+calibrations = pd.read_csv("CSVfiles/averagecalibrations2.csv", index_col=0)
+
+
+wavelengths = [float(col_name) for col_name in x.columns]
+
+plt.figure(figsize=(12, 7))
+
+
+x_plot = wavelengths[start:end]
+              
+
+
+
+for leaf_type in calibrations.index:
+    y_counts = calibrations.loc[leaf_type].values
+    if SAVGOL:
+        y_counts = savgol_filter(y_counts,window_length=51, polyorder=3)
+    
+    y_plot = y_counts[start:end]
+    
+    plt.plot(x_plot, y_plot, label=f"{leaf_type}")
+
+plt.xlabel("Wavelength (nm)")
+plt.ylabel("Reflectance")
+plt.legend()
+plt.show()

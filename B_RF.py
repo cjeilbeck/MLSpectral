@@ -5,11 +5,13 @@ from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.pipeline import Pipeline            
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt  
-from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,multispectral,indicesmav, indicescustomrf,problemtype
+from scipy.signal import savgol_filter, find_peaks, peak_widths
+from A_functions import haircut,read_data,multispectral,indicesmav, indicescustomrf,problemtype, indicescustom
 import numpy as np
 import os
 import random
+import seaborn as sns
+from scipy.stats import entropy
 
 plt.rcParams.update({'font.size': 25})
 def apply_savgol(x):
@@ -18,6 +20,8 @@ def apply_savgol(x):
 USE_SCALING = False
 USE_SAVGOL = True
 HAIRCUT = True 
+
+CUSTOMBANDPLOTS = False
 
 z= 42
 
@@ -134,11 +138,13 @@ for train_index, val_index in skf.split(x_train, y_train):
 mean_importance = np.mean(importances, axis=0)
 std_importance = np.std(importances, axis=0)
 
+err_importance = std_importance / np.sqrt(5)
+
 featurefile = pd.DataFrame({'index': x_train.columns,'importance': mean_importance,'std': std_importance})
 
 if INDICES or CUSTOMRF:
     plt.figure(figsize=(12, 6))
-    plt.bar(featurefile['index'], featurefile['importance'], yerr=featurefile['std'], color='purple',capsize=5,error_kw={'alpha': 0.6, 'linewidth': 1.5})
+    plt.bar(featurefile['index'], featurefile['importance'], yerr=[np.zeros(len(featurefile)), featurefile['std']], color='purple',capsize=10,error_kw={'alpha': 1, 'linewidth': 2})
     plt.xlabel("Index")
     plt.ylabel("Importance Score")
     plt.show()
@@ -147,9 +153,32 @@ else:
     featurefile['smoothed'] = savgol_filter(featurefile['importance'], window_length=51, polyorder=3, axis=-1)
     featurefile['smoothed_std'] = savgol_filter(featurefile['std'], window_length=51, polyorder=3, axis=-1)
 
+
+    centres=[420,555,676,710]
+    widths =[32,20,20,32]
+
+
     plt.figure(figsize=(12, 6))
     plt.plot(featurefile['index'], featurefile['smoothed'], color='red', linewidth=2)
+    if CUSTOMBANDPLOTS:
+        for i, (c, w) in enumerate(zip(centres, widths)):
+            plt.axvspan(c-w/2, c+w/2, alpha=0.25, color='steelblue', label=f'Centre: {c}nm')
+    
+            plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.fill_between(featurefile['index'], featurefile['smoothed'] - featurefile['smoothed_std'], featurefile['smoothed'] + featurefile['smoothed_std'], color='red', alpha=0.2, label='±1 Std. Dev.')
+    
+  
     plt.xlabel("Wavelength (nm)")
     plt.ylabel("Importance Score")
+    plt.tight_layout()
     plt.show()
+
+
+probs = model.named_steps['rf_model'].predict_proba(x_test)
+shentropy = entropy(probs, axis=1,base=2)
+entropyfile = pd.DataFrame({'Class': y_test,'Entropy': shentropy})
+plt.figure(figsize=(12, 6))
+sns.boxplot(x='Class', y='Entropy', data=entropyfile, palette="rocket",hue='Class',legend=False)
+
+plt.ylabel('Entropy')
+plt.show()
