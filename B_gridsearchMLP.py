@@ -18,17 +18,20 @@ def apply_savgol(x):
 
 HAIRCUT = True
 left, right = 206, 910
-INDICES = True
+INDICES = False
 SAVGOL=True
-CUSTOM = False 
+CUSTOM = True 
 
 #typesofdatasetup
 GUMCOMB = False
-OAKONLY = True
+OAKONLY = False
+TESTGUM = False
 if GUMCOMB: 
     problem = 'binary'
 elif OAKONLY: 
     problem = 'oak'
+elif TESTGUM:
+    problem = 'gum'
 else: 
     problem = 'all'
 
@@ -89,7 +92,7 @@ class Brad(nn.Module):
         return self.layers(x)
 
 
-patience = 50
+patience = 40
 
 early_stopping = EarlyStopping(
     monitor='valid_loss', 
@@ -119,7 +122,7 @@ params = {'net__module__layer_sizes': [(128,64),(64,32),(32,16)],
 
 #params = {'net__module__layer_sizes': [(128,64)],'net__lr': [0.01],'net__module__drop': [0.1]}
 
-cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
 gs = GridSearchCV(pipe, params, refit='primary_score', verbose=2, cv=cv, n_jobs=1, scoring=scoring)
 gs.fit(x_train.astype(np.float32), y_train.astype(np.int64))
 
@@ -139,47 +142,61 @@ best_error = best_std / np.sqrt(5)
 print(patience)
 print(f"Best Error: {best_error:.4f}")
 
-#patience = 40
 
-#SPECTRA (deterministic)                                                                 params  mean_test_primary_score  std_test_primary_score              mean_test_epochs  std_test_epochs
-7    #{'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.991667                0.010541             246.0        79.701945
-8    #{'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}                 0.991667                0.012910             227.8        64.857999
+#SPECTRA                                                                                  params  mean_test_primary_score  std_test_primary_score  error             mean_test_epochs  std_test_epochs
+8    #{'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}             0.996667                0.006667             235.0        47.505789
 
 
-#indexes
-0    #{'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.938333                0.022111              55.6         7.964923
-3    #{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.938333                0.017951              55.4         7.391887
+#INDEX
 
 
-#indexes on gumcomb 
+#patience = 40 (standard)
+#{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.946667                0.018708             121.0        62.858571
 
-1    # {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.973333                0.006236             130.8        15.276125
-3    #{'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.973333                0.013333             118.0        34.047026
-
-
-#indexes on oakonly
-
-#   {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.950000                0.013944              81.2        65.967871
+#patience = 20
+#0    {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.928333                0.020817              56.4        26.378779
+#patience = 80
+#0    {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.953333                0.010000             288.2       104.730893
 
 
 
-#PATIENCE = 50
-#spectra
+#CUSTOM
 
-#  11   {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (32, 16)}                 0.995000                0.010000             327.0       138.977696
-# #  {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.993333                0.009718             198.0        44.890979
+"""  green = M(425)
+    red = M(485)  
+    re = M(665)  
+    nir = M(700)"""
 
-#indexes  
-#0    {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.945000                0.023333              64.4         6.800000
-#     {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}                 0.945000                0.018708              99.8        32.492461
+#10   {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (64, 32)}                 0.988333                0.011304             246.0        94.065934
+#11   {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (32, 16)}                 0.988333                0.011304             355.4        99.177820
+#3    {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.986667                0.010000              85.2        29.822139
+
 
 #GUMCOMB
 
-#1     {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.973333                0.011055             174.4        93.941684
-#3    {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.973333                0.006236             109.4        36.702044
+1#{'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                 0.973333                0.006236             130.8        15.276125
 
 
 #OAKONLY
 
-#3    {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.955000                0.015456             111.0        61.096645
-#0    {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                 0.953333                0.012472              83.6        48.014998
+#3    {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.950000                0.013944              81.2        65.967871
+
+
+#GUM only 
+"""
+Best Parameters: {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}
+                                                                                 params  mean_test_primary_score  std_test_primary_score  mean_test_epochs  std_test_epochs
+0    {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                      1.0                     0.0              50.4         1.019804
+1     {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                      1.0                     0.0              65.8         3.762978
+2     {'net__lr': 0.01, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}                      1.0                     0.0              78.4         1.356466
+3    {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                      1.0                     0.0              50.0         0.632456
+4     {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (64, 32)}                      1.0                     0.0              66.4         4.758151
+5     {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (32, 16)}                      1.0                     0.0             213.2       219.280095
+6   {'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (128, 64)}                      1.0                     0.0            1000.0         0.000000
+7    {'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (64, 32)}                      1.0                     0.0            1000.0         0.000000
+8    {'net__lr': 0.001, 'net__module__drop': 0.1, 'net__module__layer_sizes': (32, 16)}                      1.0                     0.0            1000.0         0.000000
+9   {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                      1.0                     0.0            1000.0         0.000000
+10   {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (64, 32)}                      1.0                     0.0            1000.0         0.000000
+11   {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (32, 16)}                      1.0                     0.0            1000.0         0.000000"""
+
+#WHY THE HELL DOES IT GO TO MAX EPOCHS WTH LOWER LR?  

@@ -5,8 +5,8 @@ from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.pipeline import Pipeline            
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt  
-from scipy.signal import savgol_filter, find_peaks, peak_widths
-from A_functions import haircut,read_data,multispectral,indicesmav, indicescustomrf,problemtype, indicescustom
+from scipy.signal import savgol_filter
+from A_functions import haircut,read_data,multispectral,indicesmav, indicescustomrf,problemtype, indicescustom, customlabels
 import numpy as np
 import os
 import random
@@ -21,7 +21,7 @@ USE_SCALING = False
 USE_SAVGOL = True
 HAIRCUT = True 
 
-CUSTOMBANDPLOTS = False
+CUSTOMBANDPLOTS = True
 
 z= 42
 
@@ -34,8 +34,8 @@ right=910
 
 test_sizeinput = 0.2
 
-INDICES = True 
-CUSTOMRF = False
+INDICES = False 
+CUSTOMRF = True
 
 
 if INDICES:
@@ -87,13 +87,13 @@ if TEST:
 elif INDICES and GUMCOMB and TEST==False:
     rf = RandomForestClassifier(n_estimators=200,criterion='gini',max_depth=15,max_features='sqrt',class_weight='balanced',random_state=z)
 elif INDICES and TEST==False:
-    rf = RandomForestClassifier(n_estimators=200, criterion='log_loss',max_depth=15,max_features='sqrt',class_weight='balanced',random_state=z)
+    rf = RandomForestClassifier(n_estimators=50, criterion='gini',max_depth=15,max_features='sqrt',class_weight=None,random_state=z)
 elif CUSTOMRF and TEST==False:
-    rf = RandomForestClassifier(n_estimators=150,criterion='gini',max_depth=10,max_features='sqrt',class_weight='balanced',random_state=z)
+    rf = RandomForestClassifier(n_estimators=100, criterion='log_loss',max_depth=10,max_features='sqrt',class_weight=None,random_state=z)
 elif OAKONLY and TEST==False:
-    rf = RandomForestClassifier(n_estimators=150,criterion='log_loss', max_depth=15, max_features='sqrt',class_weight='balanced',random_state=z)
+    rf = RandomForestClassifier(n_estimators=50,criterion='gini', max_depth=10, max_features='sqrt',class_weight=None,random_state=z)
 else:
-    rf = RandomForestClassifier(n_estimators=150,criterion='log_loss',max_depth=10,max_features='sqrt',class_weight=None,random_state=z)
+    rf = RandomForestClassifier(n_estimators=150,criterion='log_loss',max_depth=10,max_features='log2',class_weight='balanced',random_state=z)
 
 
 
@@ -109,6 +109,7 @@ print(f"Cross-Validation Accuracy Scores: {cv_scores}")
 print(f"Mean CV Accuracy: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 
 model.fit(x_train, y_train)
+probs = model.predict_proba(x_test)
 y_pred = model.predict(x_test)
 accuracy = accuracy_score(y_test, y_pred)
 
@@ -116,10 +117,6 @@ print(f"Testing Accuracy: {accuracy:.4f}")
 print("Classification Report:")
 print(classification_report(y_test, y_pred))
 
-cm = confusion_matrix(y_test, y_pred)
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.named_steps['rf_model'].classes_)
-disp.plot(cmap=plt.cm.Blues)
-plt.show()
 """
 if INDICES and GUMCOMB==False and CUSTOMRF==False:
     results_df = pd.DataFrame({'y_true': y_test,'y_pred_rf': y_pred})
@@ -154,8 +151,8 @@ else:
     featurefile['smoothed_std'] = savgol_filter(featurefile['std'], window_length=51, polyorder=3, axis=-1)
 
 
-    centres=[420,555,676,710]
-    widths =[32,20,20,32]
+    centres=[415,545,675,715]
+    widths =[32,32,32,32]
 
 
     plt.figure(figsize=(12, 6))
@@ -164,21 +161,33 @@ else:
         for i, (c, w) in enumerate(zip(centres, widths)):
             plt.axvspan(c-w/2, c+w/2, alpha=0.25, color='steelblue', label=f'Centre: {c}nm')
     
-            plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+            #plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.fill_between(featurefile['index'], featurefile['smoothed'] - featurefile['smoothed_std'], featurefile['smoothed'] + featurefile['smoothed_std'], color='red', alpha=0.2, label='±1 Std. Dev.')
     
   
     plt.xlabel("Wavelength (nm)")
     plt.ylabel("Importance Score")
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.show()
 
 
-probs = model.named_steps['rf_model'].predict_proba(x_test)
+
 shentropy = entropy(probs, axis=1,base=2)
 entropyfile = pd.DataFrame({'Class': y_test,'Entropy': shentropy})
-plt.figure(figsize=(12, 6))
-sns.boxplot(x='Class', y='Entropy', data=entropyfile, palette="rocket",hue='Class',legend=False)
 
+
+if not OAKONLY and not GUMCOMB:
+        entropyfile['Class'] = entropyfile['Class'].map(customlabels)
+        displaylabels = [customlabels[c] for c in model.named_steps['rf_model'].classes_]
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(x='Class', y='Entropy', data=entropyfile, palette="viridis",hue='Class',legend=False)
 plt.ylabel('Entropy')
 plt.show()
+
+cm = confusion_matrix(y_test, y_pred)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=displaylabels)
+disp.plot(cmap=plt.cm.Blues)
+plt.show()
+
+

@@ -28,12 +28,12 @@ right=910
 
 test_sizeinput = 0.2
 
-INDICES = True
+INDICES = False
 if INDICES:
     HAIRCUT = False
     USE_SAVGOL = False
 
-CUSTOMRF = False
+CUSTOMRF = True
 if CUSTOMRF:
     INDICES = False
     HAIRCUT = False
@@ -42,14 +42,16 @@ if CUSTOMRF:
 data=pd.read_csv("CSVfiles/datacalibrated.csv")
 
 GUMCOMB = False
-OAKONLY = True
-
+OAKONLY = False
+GUM = False
 if GUMCOMB:
     problem = 'binary'
 elif OAKONLY:
     problem = 'oak'
 else:
     problem = 'all'
+if GUM:
+    problem = 'gum'
 
 data = problemtype(data, problem)
 y = data['leaf_type']
@@ -86,18 +88,51 @@ grid_search.fit(x_train, y_train)
 
 print(f"Best Parameters: {grid_search.best_params_}")
 
-
-#Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 15, 'rf_model__max_features': 'sqrt', 'rf_model__min_samples_leaf': 1, 'rf_model__n_estimators': 50} FOR INDEX
-#Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 10, 'rf_model__max_features': 'log2', 'rf_model__min_samples_leaf': 1, 'rf_model__n_estimators': 150} FOR NORMAL
-
+results = pd.DataFrame(grid_search.cv_results_)
+pd.set_option('display.max_colwidth', None)
+results = results.sort_values(by='mean_test_score', ascending=False)
+print(results[['params', 'mean_test_score', 'std_test_score']])
 
 
 #revampedsearch
 
-#Best Parameters: {'rf_model__class_weight': None, 'rf_model__criterion': 'gini', 'rf_model__max_depth': 15, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 50} INDEXES
+#Best Parameters: {'rf_model__class_weight': None, 'rf_model__criterion': 'gini', 'rf_model__max_depth': 15, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 50} INDEXES    # does imbalanced class weight help due to easy classification of young gum which would otherwise be prioritised?
 #Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'gini', 'rf_model__max_depth': 15, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 200} #INDEXGUMCOMB
-#Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'gini', 'rf_model__max_depth': 10, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 150} #INDEXESCUSTOM
+
 #Best Parameters: {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 10, 'rf_model__max_features': 'log2', 'rf_model__min_samples_leaf': 1, 'rf_model__n_estimators': 150} FOR NORMAL
+
+
+#OAK
+"""
+64             {'rf_model__class_weight': None, 'rf_model__criterion': 'gini', 'rf_model__max_depth': 10, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 50}         0.943333        0.016159
+42  {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 15, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 150}         0.943333        0.016159
+46  {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 15, 'rf_model__max_features': 'log2', 'rf_model__n_estimators': 150}         0.943333        0.016159
+50  {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 20, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 150}         0.943333        0.016159
+54  {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 20, 'rf_model__max_features': 'log2', 'rf_model__n_estimators': 150}         0.943333        0.016159
+
+"""
+
+
+#CUSTOM
+"""
+{'rf_model__class_weight': None, 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 10, 'rf_model__max_features': 'sqrt', 'rf_model__n_estimators': 100}         0.980000        0.013540
+117        {'rf_model__class_weight': None, 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 20, 'rf_model__max_features': 'log2', 'rf_model__n_estimators': 100}         0.980000        0.013540
+38   {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 10, 'rf_model__max_features': 'log2', 'rf_model__n_estimators': 150}         0.980000        0.013540"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

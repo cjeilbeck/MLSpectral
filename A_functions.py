@@ -12,7 +12,6 @@ from sklearn.model_selection import train_test_split
 from scipy.stats import gaussian_kde
 
 
-
 def haircut(x,left,right):   
     total_cols = x.shape[1]
     x = x.iloc[: ,left+1:total_cols-right]
@@ -263,10 +262,10 @@ def indicescustomrf(x):
     def M(w, width=32):
         intensity = multispectral(x, [w], width=width, Dif=False)
         return intensity.iloc[:, 0]
-    green = M(420)
-    red = M(555)  
+    green = M(415)
+    red = M(545)  
     re = M(675)  
-    nir = M(710)
+    nir = M(715)
 
     ids = {}
     
@@ -286,9 +285,9 @@ def indicescustomMLP(x):
     def M(w, width=32):
         intensity = multispectral(x, [w], width=width, Dif=False)
         return intensity.iloc[:, 0]
-    green = M(410)
+    green = M(425)
     red = M(485)  
-    re = M(650)  
+    re = M(665)  
     nir = M(700)
 
     ids = {}
@@ -310,9 +309,9 @@ def indicescustomSVM(x):
         intensity = multispectral(x, [w], width=width, Dif=False)
         return intensity.iloc[:, 0]
     green = M(440)
-    red = M(675)
-    re = M(720)
-    nir = M(820)
+    red = M(555)
+    re = M(675)
+    nir = M(710)
 
     ids = {}
     
@@ -411,12 +410,16 @@ def problemtype(file, problemtype):
     elif problemtype == 'gum':
         data = data[data['leaf_type'].isin(['Gum_young', 'Gum_old'])].copy()
         data['leaf_type'] = data['leaf_type'].replace({'Gum_young': 'Young Gum', 'Gum_old': 'Old Gum'})
-
     elif problemtype == 'oak':
         data['leaf_type'] = data['leaf_type'].replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
         data['leaf_type'] = data['leaf_type'].replace(['Oakcork'], 'Oak')
     return data
 
+
+customlabels = {'Gum_old':  'Old Gum',
+    'Gum_young': 'Young Gum',
+    'Oakcork':  'Oak',
+    'Pine':     'Pine'}
     
 def KDEpriorfunction(file, index, truelabels='leaf_type'):
     classes = file[truelabels].unique()

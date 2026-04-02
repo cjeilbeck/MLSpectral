@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
 from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,scaling,gradanal, indicesmav, indicescustomMLP, problemtype, indicespaper,indicescustom
+from A_functions import haircut,read_data,scaling,gradanal, indicesmav, indicescustomMLP, problemtype, indicespaper,indicescustom, customlabels
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -23,7 +23,7 @@ ncomp = 4
 USE_SAVGOL = True
 smooth =51
 
-TESTGRAPHS = True
+TESTGRAPHS = False
 CVGRAPHS = True
 CUSTOMBANDPLOTS = True
 
@@ -37,15 +37,16 @@ GRADANALYSIS = True
 
 #typesofdatasetup
 GUMCOMB = False
+OAKONLY = False
+
 if GUMCOMB: problem = 'binary'
 
-OAKONLY = False
-if OAKONLY: problem = 'oak'
+elif OAKONLY: problem = 'oak'
 
 else: problem = 'all'
 
 INDICES = False
-CUSTOM = False
+CUSTOM = True
 
 if INDICES:
     HAIRCUT = False
@@ -61,83 +62,49 @@ patience = 50
 test_sizeinput = 0.2
 
 
-if patience ==40:
-    if INDICES and GUMCOMB:
-        lr=0.01
 
-        drop=0.1
-        neurons2=32
-        neurons1=2*neurons2
-        epochs = 131
+if INDICES and GUMCOMB:
+    lr=0.01
 
-    elif INDICES and OAKONLY:
-        lr=0.01
+    drop=0.1
+    neurons2=32
+    neurons1=2*neurons2
+    epochs = 131
 
-        drop=0.2
-        neurons2=64
-        neurons1=2*neurons2
-        epochs = 81
+elif INDICES and OAKONLY:
+    lr=0.01
 
-    elif INDICES or CUSTOM:
-        
-        lr=0.01
-        neurons2=64
-        neurons1=2*neurons2
-        if INDICES:
-            epochs = 55
-            drop=0.2
-        if CUSTOM:
-            epochs = 79
-            drop = 0.1
+    drop=0.2
+    neurons2=64
+    neurons1=2*neurons2
+    epochs = 81
 
-    else:
-        epochs = 228
-        lr=0.001
+elif INDICES:
+    
+    lr=0.01
+    neurons2=64
+    neurons1=2*neurons2
+    drop = 0.2
+    epochs = 121
 
-        drop=0.1
-        neurons2=16
-        neurons1=2*neurons2
+elif CUSTOM:
+    lr=0.001
+    neurons2=32
+    neurons1=2*neurons2
+    drop = 0.2
+    epochs = 246    #this is for without green area; does it generalise well to unknown samples? question for report
 
 
-if patience == 50:
-    if INDICES and GUMCOMB:
-        lr=0.01
+else:
+    epochs = 235
+    lr=0.001
 
-        drop=0.1
-        neurons2=32
-        neurons1=2*neurons2
-        epochs = 174
+    drop=0.1
+    neurons2=16
+    neurons1=2*neurons2
 
-    elif INDICES and OAKONLY:
-        lr=0.01
 
-        drop=0.2
-        neurons2=64
-        neurons1=2*neurons2
-        epochs = 111
 
-    elif INDICES:
-        
-        lr=0.01
-        neurons2=64
-        neurons1=2*neurons2
-        epochs = 64
-        drop=0.1
-
-    elif CUSTOM:
-        lr=0.01
-        neurons2=16
-        neurons1=2*neurons2
-        epochs = 50
-        drop=0.1
-
-    else:
-        epochs = 327
-        lr=0.001
-
-        drop=0.2
-        neurons2=16
-        neurons1=2*neurons2
 
 seed = 42
 os.environ['PYTHONHASHSEED'] = str(seed)
@@ -330,8 +297,8 @@ if CVGRAPHS:
             plt.plot(wav, mean_attr, color='purple')
 
             if CUSTOMBANDPLOTS:
-                centres=[410,450,665,720]
-                widths =[10,40,40,32]
+                centres=[425,485,665,700]
+                widths =[32,32,32,32]
 
 
 
@@ -429,13 +396,9 @@ print(f"Test Accuracy: {test_acc:.4f}")
 print("Classification Report:")
 print(classification_report(testtrue_labels, testpred_labels))
 
-cm = confusion_matrix(testtrue_labels, testpred_labels)
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labelencoder.classes_)
-disp.plot(cmap=plt.cm.Blues)
-plt.title("Confusion test set")
-plt.show()
 
-entropyfile = pd.DataFrame({'Entropy': shentropy,'Class': testtrue_labels})
+
+
 '''
 if INDICES and OAKONLY==False and GUMCOMB==False and CUSTOM==False:
     results_df = pd.DataFrame({'y_true': testtrue_labels,'y_pred_mlp': testpred_labels})
@@ -469,10 +432,17 @@ if TESTGRAPHS:
     plt.legend()
     plt.show()
 
-    plt.figure(figsize=(8, 5))
-    plt.hist(shentropy, bins=10, color='orange', edgecolor='black', alpha=0.7)
-    plt.xlabel('Entropy')
-    plt.ylabel('Count')
+
+    entropyfile = pd.DataFrame({'Entropy': shentropy,'Class': testtrue_labels})
+
+    if not OAKONLY and not GUMCOMB:
+        entropyfile['Class'] = entropyfile['Class'].map(customlabels)
+        displaylabels = [customlabels[c] for c in labelencoder.classes_]
+
+    cm = confusion_matrix(testtrue_labels, testpred_labels)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=displaylabels)
+    disp.plot(cmap=plt.cm.Blues)
+    plt.title("Confusion test set")
     plt.show()
 
     plt.figure(figsize=(12, 6))
@@ -480,3 +450,11 @@ if TESTGRAPHS:
     #plt.xticks(rotation=45)
     plt.ylabel('Entropy')
     plt.show()
+    
+ 
+"""
+    plt.figure(figsize=(8, 5))
+    plt.hist(shentropy, bins=10, color='orange', edgecolor='black', alpha=0.7)
+    plt.xlabel('Entropy')
+    plt.ylabel('Count')
+    plt.show()"""
