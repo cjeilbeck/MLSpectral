@@ -1,0 +1,269 @@
+import pandas as pd
+from pathlib import Path
+import sys
+cdir = Path(__file__).parent
+root = cdir.parent
+sys.path.append(str(root))
+from sklearn.model_selection import train_test_split,StratifiedKFold, cross_val_score, cross_validate
+from sklearn.preprocessing import StandardScaler, FunctionTransformer
+from sklearn.svm import SVC
+from sklearn.inspection import permutation_importance
+from sklearn.decomposition import PCA              
+from sklearn.pipeline import Pipeline            
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay, cohen_kappa_score
+import matplotlib.pyplot as plt  
+from scipy.signal import savgol_filter
+from FUNCTIONS.A_functions import haircut,read_data,multispectral,indicesmav, indicescustomSVM,problemtype, customlabels, indicescustomrf,indicescustomMLP
+import numpy as np
+import os
+import random
+import seaborn as sns
+from scipy.stats import entropy
+
+plt.rcParams.update({                
+    'font.size': 9,           
+    'axes.labelsize': 10,
+    'xtick.labelsize': 8,
+    'ytick.labelsize': 8,
+    'lines.linewidth': 1,   
+    'axes.linewidth': 0.5,    
+    'xtick.direction': 'out',   
+    'ytick.direction': 'out',
+    'xtick.top': False,         
+    'ytick.right': False   
+})
+
+def apply_savgol(x):
+    return savgol_filter(x, window_length=51, polyorder=3, axis=1)
+
+USE_SCALING = True
+USE_PCA = False
+USE_SAVGOL = True
+HAIRCUT = True 
+CUSTOMBANDPLOTS = True
+z= 42
+
+SAVEFIG =False
+name = 'svm_predictionsOAK.csv'
+os.environ['PYTHONHASHSEED'] = str(z)
+random.seed(z)
+np.random.seed(z)  
+
+comp = 4 
+left= 200
+right=900
+
+test_sizeinput = 0.2
+
+#indices is commercial data, custom is custom bands; both off for hyperspectral processing
+INDICES = False 
+CUSTOM = False
+
+OAKONLY = False
+GUMCOMB = False
+
+
+if INDICES:
+    HAIRCUT = False
+    USE_SAVGOL = False
+
+if CUSTOM:
+    INDICES = False
+    HAIRCUT = False
+    USE_SAVGOL = False
+
+if OAKONLY and INDICES:
+    KERNEL = 'rbf' 
+    C = 1000   
+    GAMMA = 1
+
+elif GUMCOMB and INDICES:
+    KERNEL = 'rbf' 
+    C = 100.0   
+    GAMMA = 1
+
+elif INDICES:
+    KERNEL = 'rbf' 
+    C = 10000   
+    GAMMA = 1
+
+elif CUSTOM:
+    KERNEL = 'linear' 
+    C = 10000
+    GAMMA = 1
+
+else:
+    KERNEL = 'linear' 
+    C = 1 
+    GAMMA = 1 #irrelevant       
+    CLASSWEIGHT = None   
+
+data=pd.read_csv("CSVfiles/datacalibrated.csv")
+
+if GUMCOMB:
+    problem = 'binary'
+elif OAKONLY:
+    problem = 'oak'
+else:
+    problem = 'all'
+
+data = problemtype(data, problem)
+y = data['leaf_type']
+x = data.drop(columns=['leaf_type','sample_id'])    
+
+
+
+
+if HAIRCUT:
+    x = haircut(x,left,right)
+    print(f"trimmed wav:",x.columns[0],x.columns[-1])
+
+if INDICES:
+    x = indicesmav(x)
+if CUSTOM:
+    x = indicescustomSVM(x)
+
+
+x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=test_sizeinput,random_state=z,stratify=y)
+
+pipeline_steps = []
+
+if USE_SAVGOL:
+    pipeline_steps.append(('savgol', FunctionTransformer(apply_savgol)))
+
+if USE_SCALING:
+    pipeline_steps.append(('scaler', StandardScaler()))
+
+if USE_PCA:
+    pipeline_steps.append(('pca', PCA(n_components=comp)))
+
+pipeline_steps.append(('svm_model', SVC(kernel=KERNEL, C=C, gamma=GAMMA, probability=True, random_state=z, class_weight=None)))
+model = Pipeline(pipeline_steps)
+
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=z)
+cv_results = cross_validate(model, x_train, y_train, cv=skf, return_estimator=True)
+cv_scores = cv_results['test_score']
+print(f"Cross-Validation Accuracy Scores: {cv_scores}")
+print(f"Mean CV Accuracy: {cv_scores.mean():.4f} ± {(cv_scores.std())/np.sqrt(5):.4f}")
+
+cv_pipe = cv_results['estimator']
+
+model.fit(x_train, y_train)
+y_pred = model.predict(x_test)
+probs = model.predict_proba(x_test)
+accuracy = accuracy_score(y_test, y_pred)
+
+print(f"Testing Accuracy: {accuracy:.4f}")
+print("Classification Report:")
+print(classification_report(y_test, y_pred, digits=4))
+print(f"Cohen's Kappa: {cohen_kappa_score(y_test, y_pred):.4f}")
+
+
+
+if SAVEFIG:
+    results_df = pd.DataFrame({'y_true': y_test,'y_pred_svm': y_pred})
+    results_df.to_csv(name, index=False)
+    print("Saved to CSV")
+
+
+
+if model.named_steps['svm_model'].kernel == 'linear':
+    if CUSTOM:
+        weights = []
+        for pipeline in cv_pipe:
+            svm = pipeline.named_steps['svm_model']
+            weights.append(svm.coef_[0])
+        
+
+        ameanw = np.mean(np.abs(weights), axis=0)
+
+        stdw = np.std(np.abs(weights), axis=0)
+        plt.figure(figsize=(12, 6))
+        meanallimportance = np.mean(ameanw)
+        plt.axhline(meanallimportance, color='black', alpha=0.5,linestyle='--')
+        colors = [(0.4,0.6,0.2,0.8) if i<4 else (0.2,0.4,0.8,0.8) for i in range(len(ameanw))]
+        plt.bar(x_train.columns, ameanw, yerr=stdw, color=colors,capsize=10,error_kw={'alpha': 1, 'linewidth': 2})
+        plt.xlabel("Custom Features")
+        plt.ylabel("Mean Absolute Weight")
+        plt.tight_layout()
+        plt.show()
+        customweightsdf = pd.DataFrame({'index': x_train.columns,'importance': ameanw,'std': stdw})
+        customweightsdf.to_csv('svm_customfeatureweights.csv', index=False)
+
+    else:
+        weights = []
+        for pipeline in cv_pipe:
+            svm = pipeline.named_steps['svm_model']
+            weights.append(svm.coef_[0])
+        
+        ameanw = np.mean(np.abs(weights), axis=0)
+        stdw = np.std(np.abs(weights), axis=0)
+        stdw = stdw/np.sqrt(5)
+
+        centres=[445,555,675,710]
+        widths =[32,32,32,32]
+
+        plt.figure(figsize=(3.5, 2.65),dpi=300)
+        plt.plot(pd.to_numeric(x_train.columns), ameanw, color='red')
+
+        if CUSTOMBANDPLOTS:
+            for i, (c, w) in enumerate(zip(centres, widths)):
+                plt.axvspan(c-w/2, c+w/2, facecolor=(1,0.8,0,0.15),edgecolor=(0,0,0,1), linewidth=0.2,linestyle='--')
+
+        plt.fill_between(pd.to_numeric(x_train.columns), ameanw - stdw, ameanw + stdw, color='red', alpha=0.2,edgecolor='none')
+    
+        plt.xlabel("Wavelength (nm)")
+        plt.ylabel("Mean Absolute Weight")
+        plt.tight_layout()
+        plt.show()
+
+
+    wavs = pd.to_numeric(x_train.columns).values
+    imps = ameanw
+    half = 16  
+    centers = []
+    windowtot = []
+    for center in np.arange(wavs.min()+half,wavs.max()-half, 1):
+        mask = (wavs >= center-half) & (wavs <= center+half)
+        centers.append(center)
+        windowtot.append(imps[mask].sum())
+    centers = np.array(centers)
+    windowtot = np.array(windowtot)
+    plt.figure(figsize=(15, 5))
+    plt.plot(centers, windowtot, color='blue', linewidth=1.5)
+
+if model.named_steps['svm_model'].kernel != 'linear' and INDICES:
+    fold_importances = []
+    for fold_idx, (train_idx, val_idx) in enumerate(skf.split(x_train, y_train)):
+        x_val_fold = x_train.iloc[val_idx]
+        y_val_fold = y_train.iloc[val_idx]
+        fold_pipeline = cv_pipe[fold_idx]
+        result = permutation_importance(fold_pipeline, x_val_fold, y_val_fold, random_state=z)
+        fold_importances.append(result.importances_mean)
+    
+    fold_importances = np.array(fold_importances)  
+    importances = fold_importances.mean(axis=0)
+    std_importances = fold_importances.std(axis=0)
+    
+    featurefile = pd.DataFrame({'index': x_train.columns,'importance': importances,'std': std_importances})
+    featurefile.to_csv('svm_index_importances.csv', index=False)
+
+
+shentropy = entropy(probs, axis=1,base=2)
+entropyfile = pd.DataFrame({'Class': y_test,'Entropy': shentropy})
+
+
+if not OAKONLY and not GUMCOMB:
+        entropyfile['Class'] = entropyfile['Class'].map(customlabels)
+        displaylabels = [customlabels[c] for c in model.named_steps['svm_model'].classes_]
+else:        displaylabels = model.named_steps['svm_model'].classes_
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(x='Class', y='Entropy', data=entropyfile, palette="rocket",hue='Class',legend=False)
+plt.ylabel('Entropy')
+plt.show()
+
+cm = confusion_matrix(y_test, y_pred)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=displaylabels)
+disp.plot(cmap=plt.cm.Greens)
+plt.show()

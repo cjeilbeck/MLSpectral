@@ -1,4 +1,9 @@
 import pandas as pd
+from pathlib import Path
+import sys
+cdir = Path(__file__).parent
+root = cdir.parent
+sys.path.append(str(root))
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.preprocessing import StandardScaler,FunctionTransformer
 from sklearn.svm import SVC
@@ -6,9 +11,8 @@ from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline            
 import matplotlib.pyplot as plt  
 from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,indicesmav, indicescustomSVM,problemtype
+from FUNCTIONS.A_functions import haircut,read_data,indicesmav, indicescustomSVM,problemtype
 import numpy as np
-import seaborn as sns
 
 def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
@@ -26,23 +30,18 @@ right=910
 #3648 wavelength values for reference, 345 - 1038nm
 
 
-
 seed = 42
 os.environ['PYTHONHASHSEED'] = str(seed)
 random.seed(seed)
 np.random.seed(seed)
-
-
-
-
 test_sizeinput = 0.2
 
+
+#indices is commercial data, custom is custom bands; both off for hyperspectral processing
 GUMCOMB = False
 OAKONLY = False
-
-
 INDICES = False
-CUSTOM = True
+CUSTOM = False
 
 if INDICES:
     HAIRCUT = False
@@ -70,8 +69,6 @@ data = problemtype(data, problem)
 y = data['leaf_type']
 x = data.drop(columns=['leaf_type','sample_id'])    
 
-
-
 if HAIRCUT:
     x = haircut(x,left,right)
     print(f"trimmed wav:",x.columns[0],x.columns[-1])
@@ -81,18 +78,14 @@ if INDICES:
 if CUSTOM:
     x = indicescustomSVM(x)
 
-
-
 x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=test_sizeinput,random_state=seed,stratify=y)
 
 pipeline_steps = []
 
 if USE_SAVGOL:
     pipeline_steps.append(('savgol', FunctionTransformer(apply_savgol)))
-
 if USE_SCALING:
     pipeline_steps.append(('scaler', StandardScaler()))
-
 if USE_PCA:
     pipeline_steps.append(('pca', PCA(n_components=comp)))
 
@@ -100,10 +93,7 @@ pipeline_steps.append(('svm_model', SVC(kernel=KERNEL, C=C, gamma=GAMMA, random_
 model = Pipeline(pipeline_steps)
 
 
-params = {'svm_model__kernel': ['rbf','linear'],'svm_model__C': [1,10,1e2,1e3,1e4],'svm_model__gamma': [1,0.1,0.001,0.0001,'scale']}
-
-
-
+params = {'svm_model__kernel': ['rbf','linear'],'svm_model__C': [1,10,1e2,1e3,1e4],'svm_model__gamma': [1,0.1,0.001,0.0001,'scale'],'svm_model__class_weight': [None, 'balanced']} #none best
 
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
 grid = GridSearchCV(model, param_grid=params, refit=True, verbose=2, cv=skf, n_jobs=-1)
@@ -111,21 +101,11 @@ grid.fit(x_train, y_train)
 print(f"best accuracy: {grid.best_score_:.4f}")
 print(f"best parameters: {grid.best_params_}")
 results_df = pd.DataFrame(grid.cv_results_)
-
-
-
 pd.set_option('display.max_colwidth', None)
+pd.set_option('display.max_rows', None)
 results = results_df.sort_values(by='mean_test_score', ascending=False)
 print(results[['params', 'mean_test_score', 'std_test_score']])
 
-heatmap_data = results_df
-pivot_table = heatmap_data.pivot(index='param_svm_model__C', columns='param_svm_model__kernel', values='mean_test_score')
-
-plt.figure(figsize=(10, 8))
-sns.heatmap(pivot_table, annot=True, cmap='viridis', fmt=".3f")
-plt.ylabel('C Parameter')
-plt.xlabel('Kernel Type')
-plt.show()
 
 #HYPERSPECTRAL
 
@@ -139,7 +119,7 @@ plt.show()
 
 #INDEX
 
-"""best parameters: {'svm_model__C': 10000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'}
+"""best parameters: {'svm_model__C': 10000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf', classweight none}
                                                                                    params  mean_test_score  std_test_score
 40           {'svm_model__C': 10000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'}         0.946667        0.015456"""
 
@@ -158,7 +138,7 @@ plt.show()
 40           {'svm_model__C': 10000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'rbf'}         0.963333        0.012472"""
 
 #CUSTOM
-
+#ignore
 """best parameters: {'svm_model__C': 1, 'svm_model__gamma': 'scale', 'svm_model__kernel': 'rbf'}
                                                                                    params  mean_test_score  std_test_score
 49  {'svm_model__C': 10000.0, 'svm_model__gamma': 'scale', 'svm_model__kernel': 'linear'}         0.988333        0.008498
@@ -168,3 +148,14 @@ plt.show()
 15         {'svm_model__C': 10, 'svm_model__gamma': 0.001, 'svm_model__kernel': 'linear'}         0.988333        0.011304
 13           {'svm_model__C': 10, 'svm_model__gamma': 0.1, 'svm_model__kernel': 'linear'}         0.988333        0.011304
 11             {'svm_model__C': 10, 'svm_model__gamma': 1, 'svm_model__kernel': 'linear'}         0.988333        0.011304"""
+
+
+#best parameters: {'svm_model__C': 10000.0, 'svm_model__class_weight': None, 'svm_model__gamma': 1, 'svm_model__kernel': 'linear'}
+
+"""best parameters: {'svm_model__C': 10000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'linear'}
+                                                                                   params  mean_test_score  std_test_score
+49  {'svm_model__C': 10000.0, 'svm_model__gamma': 'scale', 'svm_model__kernel': 'linear'}         0.988333        0.016330
+43      {'svm_model__C': 10000.0, 'svm_model__gamma': 0.1, 'svm_model__kernel': 'linear'}         0.988333        0.016330
+47   {'svm_model__C': 10000.0, 'svm_model__gamma': 0.0001, 'svm_model__kernel': 'linear'}         0.988333        0.016330
+45    {'svm_model__C': 10000.0, 'svm_model__gamma': 0.001, 'svm_model__kernel': 'linear'}         0.988333        0.016330
+41        {'svm_model__C': 10000.0, 'svm_model__gamma': 1, 'svm_model__kernel': 'linear'}         0.988333        0.016330"""

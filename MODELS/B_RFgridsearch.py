@@ -1,10 +1,15 @@
 import pandas as pd
+from pathlib import Path
+import sys
+cdir = Path(__file__).parent
+root = cdir.parent
+sys.path.append(str(root))
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.pipeline import Pipeline            
 from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,indicesmav, indicescustomrf, problemtype
+from FUNCTIONS.A_functions import haircut,read_data,indicesmav, indicescustomrf, problemtype
 import numpy as np
 import os
 import random
@@ -28,12 +33,17 @@ right=910
 
 test_sizeinput = 0.2
 
+#indices is commercial data, custom is custom bands; both off for hyperspectral processing
 INDICES = False
+CUSTOMRF = True
+GUMCOMB = False
+OAKONLY = False
+
 if INDICES:
     HAIRCUT = False
     USE_SAVGOL = False
 
-CUSTOMRF = True
+
 if CUSTOMRF:
     INDICES = False
     HAIRCUT = False
@@ -41,8 +51,7 @@ if CUSTOMRF:
 
 data=pd.read_csv("CSVfiles/datacalibrated.csv")
 
-GUMCOMB = False
-OAKONLY = False
+
 GUM = False
 if GUMCOMB:
     problem = 'binary'
@@ -79,10 +88,8 @@ x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_sizeinp
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=z)
 
 param_grid = {'rf_model__criterion': ['gini', 'log_loss'],'rf_model__n_estimators': [50, 100, 150,200],'rf_model__max_depth': [10, 15, 20, None],
-              'rf_model__max_features': ['sqrt', 'log2'],'rf_model__class_weight': ['balanced', None]
-}
+              'rf_model__max_features': ['sqrt', 'log2'],'rf_model__class_weight': ['balanced', None]}
 
-print("Running GridSearch...")
 grid_search = GridSearchCV(model, param_grid, cv=skf, scoring='accuracy', n_jobs=-1,verbose=2)
 grid_search.fit(x_train, y_train)
 
@@ -121,8 +128,9 @@ print(results[['params', 'mean_test_score', 'std_test_score']])
 
 
 
-
-
+#if we use NIR instead of red?
+#53     {'rf_model__class_weight': 'balanced', 'rf_model__criterion': 'log_loss', 'rf_model__max_depth': 20, 'rf_model__max_features': 'log2', 'rf_model__n_estimators': 100}         0.965000        0.023214
+#decrease in cv accuracy
 
 
 

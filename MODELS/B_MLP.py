@@ -1,27 +1,48 @@
 import numpy as np
 import torch
-from sklearn.decomposition import PCA
+import sys
+from pathlib import Path
+cdir = Path(__file__).parent
+root = cdir.parent
+sys.path.append(str(root))
 import torch.nn as nn
 import torch.optim as optim
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
 from scipy.signal import savgol_filter
-from A_functions import haircut,read_data,scaling,gradanal, indicesmav, indicescustomMLP, problemtype, indicespaper,indicescustom, customlabels
+from FUNCTIONS.A_functions import haircut, indicescustomSVM,read_data,scaling,gradanal, indicesmav, indicescustomMLP, problemtype, indicespaper,indicescustom, customlabels,indicescustomrf
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-plt.rcParams.update({'font.size': 25})
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+plt.rcParams.update({'font.size': 35})
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, cohen_kappa_score
 from scipy.stats import entropy
 import random
 import os
+
+plt.rcParams.update({                
+    'font.size': 9,           
+    'axes.labelsize': 10,
+    'xtick.labelsize': 8,
+    'ytick.labelsize': 8,
+    'lines.linewidth': 1,   
+    'axes.linewidth': 0.5,    
+    'xtick.direction': 'out',   
+    'ytick.direction': 'out',
+    'xtick.top': False,         
+    'ytick.right': False   
+})
+
 
 USE_SCALING = True
 USE_PCA=False
 ncomp = 4
 USE_SAVGOL = True
 smooth =51
+
+
+#USE CV GRAPHS for cross validation metrics, testgraphs for holdout set metrics
 
 TESTGRAPHS = False
 CVGRAPHS = True
@@ -31,13 +52,19 @@ HAIRCUT = True
 left = 206  #this changes accuracy a lot with minor tweaks
 right = 910
 
-
+SAVEFIG = False
+name = 'mlp_predictionsOAK.csv'
 
 GRADANALYSIS = True
 
-#typesofdatasetup
+#indices is commercial data, custom is custom bands; both off for hyperspectral processing
+INDICES = False
+CUSTOM = False
+CUSTOM1 = True
 GUMCOMB = False
 OAKONLY = False
+
+
 
 if GUMCOMB: problem = 'binary'
 
@@ -45,23 +72,21 @@ elif OAKONLY: problem = 'oak'
 
 else: problem = 'all'
 
-INDICES = False
-CUSTOM = True
+
 
 if INDICES:
     HAIRCUT = False
     USE_SAVGOL = False
 
-if CUSTOM:
+if CUSTOM or CUSTOM1:
     INDICES = False
     HAIRCUT = False
     USE_SAVGOL = False
 
-patience = 50
 
 test_sizeinput = 0.2
 
-
+#problem = 'gum'
 
 if INDICES and GUMCOMB:
     lr=0.01
@@ -92,8 +117,14 @@ elif CUSTOM:
     neurons2=32
     neurons1=2*neurons2
     drop = 0.2
-    epochs = 246    #this is for without green area; does it generalise well to unknown samples? question for report
+    epochs = 246 
 
+elif CUSTOM1:
+    lr=0.01
+    neurons2=64
+    neurons1=2*neurons2
+    drop = 0.2
+    epochs = 64
 
 else:
     epochs = 235
@@ -102,8 +133,6 @@ else:
     drop=0.1
     neurons2=16
     neurons1=2*neurons2
-
-
 
 
 seed = 42
@@ -117,8 +146,6 @@ if torch.cuda.is_available():
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-
-
 data = pd.read_csv("CSVfiles/datacalibrated.csv")
 data = problemtype(data, problem)
 y = data['leaf_type']
@@ -126,21 +153,16 @@ x = data.drop(columns=['leaf_type','sample_id'])
 
 if INDICES:
     x = indicesmav(x)    
-if CUSTOM:
+if CUSTOM or CUSTOM1:
     x = indicescustomMLP(x)
 if HAIRCUT:
     x = haircut(x,left, right)
     print(f"trimmed wav:",x.columns[0],x.columns[-1])
 
 
-
-
 labelencoder = LabelEncoder()
 y_encoded = labelencoder.fit_transform(y)
 x_train,x_test,y_train,y_test = train_test_split(x,y_encoded,test_size=test_sizeinput,random_state=seed,stratify=y_encoded)
-
-
-
 
 if USE_SAVGOL:
     x_train = savgol_filter(x_train, window_length=smooth, polyorder=3, axis=1)
@@ -155,13 +177,11 @@ idim = x_train.shape[1]  #input/output dims
 odim = len(np.unique(y_encoded))
 
 
-
-
+#MODEL
 
 class Brad(nn.Module):
     def __init__(self, input_N, classes_N):
         super().__init__()
-
 
         self.layers = torch.nn.Sequential(nn.Linear(input_N, neurons1),nn.Dropout(drop), nn.ReLU(), nn.Linear(neurons1, neurons2), nn.ReLU(),nn.Linear(neurons2, classes_N))
        
@@ -171,6 +191,7 @@ class Brad(nn.Module):
 
 
 
+#Cross validation
 
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
 
@@ -181,9 +202,6 @@ all_entropy = []
 all_testlabels = []
 all_predlabels = []
 all_attributions = []
-
-
-
 
 for fold, (train_idx, val_idx) in enumerate(skf.split(x_train, y_train)):
     xfold_train = x_train[train_idx]
@@ -222,26 +240,15 @@ for fold, (train_idx, val_idx) in enumerate(skf.split(x_train, y_train)):
             val_loss = lossfunc(val_outputs, y_valt)
             val_losses.append(val_loss.item())
 
-
-
-
-    #if epoch%10 == 0:
-        #print(epoch)
-
-
-
-
     model.eval()
     with torch.no_grad():
         test_outputs = model(x_valt)
-        _, y_pred = torch.max(test_outputs, 1)
+        y_pred = torch.argmax(test_outputs,1)
 
 
     #entropy
         probs = torch.softmax(test_outputs, 1)
         shentropy = entropy(probs.numpy(), base=2, axis=1)
-        #entropy = -torch.sum(probs * torch.log2(probs + 1e-9), dim=1).numpy()
-
 
     y_prednp = y_pred.numpy()
     y_valtnp = y_valt.numpy()
@@ -256,10 +263,8 @@ for fold, (train_idx, val_idx) in enumerate(skf.split(x_train, y_train)):
     all_testlabels.extend(testlabels)
     all_predlabels.extend(predlabels)
 
-
-
     if GRADANALYSIS:
-        wav, smoothed_attr = gradanal(model,x,x_valt,y_valt,smooth,left,right,0,savgol=USE_SAVGOL,islabel=INDICES or CUSTOM)
+        wav, smoothed_attr = gradanal(model,x,x_valt,y_valt,smooth,left,right,0,savgol=USE_SAVGOL,islabel=INDICES or CUSTOM or CUSTOM1)
         all_attributions.append((wav, smoothed_attr))
 
 
@@ -270,61 +275,80 @@ print("-"*25)
 print("fold accuracies:", fold_accuracies)
 print("-"*25)
 
-
-
 if CVGRAPHS:
     cm = confusion_matrix(all_testlabels, all_predlabels)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labelencoder.classes_)
     disp.plot(cmap=plt.cm.Blues)
     plt.show()
 
-
     if GRADANALYSIS:
         attributions = np.array([attr for _, attr in all_attributions])
         wav = all_attributions[0][0]  
         mean_attr = attributions.mean(axis=0)
         std_attr = attributions.std(axis=0)
+        std_attr = std_attr/np.sqrt(5)
 
-        if INDICES or CUSTOM:
-            plt.figure(figsize=(10, 5))
-            plt.bar(wav, mean_attr, yerr=[np.zeros(len(std_attr)), std_attr], color='purple', capsize=10, alpha=0.8)
-            plt.xlabel("Index/Band")
-            plt.ylabel("Mean Absolute Attribution")
+        if INDICES or CUSTOM or CUSTOM1:
+            colors = [(0.4,0.6,0.2,0.8) if i<4 else (0.2,0.4,0.8,0.8) for i in range(len(wav))]
+            meanallimportance = mean_attr.mean()
+            plt.axhline(meanallimportance, color='black', alpha=0.5,linestyle='--')
+            
+            plt.bar(wav, mean_attr, yerr=std_attr, color=colors,capsize=10,error_kw={'alpha': 1, 'linewidth': 2})
+            plt.xlabel("Spectral Feature")
+            plt.ylabel("Importance Score")
             plt.show()
+            featurefile = pd.DataFrame({'index': wav,'importance': mean_attr,'std': std_attr})
+            if CUSTOM or CUSTOM1:
+                featurefile.to_csv('mlp_customfeature_importances.csv', index=False)
+            else:
+                featurefile.to_csv('mlp_indexfeature_importances.csv', index=False)
         else:
             wav = np.array(wav, dtype=float)
-            plt.figure(figsize=(10, 5))
-            plt.plot(wav, mean_attr, color='purple')
+            plt.figure(figsize=(3.5, 2.65),dpi=300)
+            plt.plot(wav, mean_attr, color='red')
 
             if CUSTOMBANDPLOTS:
-                centres=[425,485,665,700]
+                centres=[425,555,665,700]
                 widths =[32,32,32,32]
 
-
-
                 for i, (c, w) in enumerate(zip(centres, widths)):
-                    plt.axvspan(c-w/2, c+w/2, alpha=0.25, color='steelblue', label=f'Centre: {c}nm')
+                    plt.axvspan(c-w/2, c+w/2, facecolor=(1,0.8,0,0.15),edgecolor=(0,0,0,1),linewidth = 0.2,linestyle='--')
         
-                    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
- 
-            plt.fill_between(wav, mean_attr - std_attr, mean_attr + std_attr, alpha=0.2, color='purple')
+                    
+            plt.fill_between(wav, mean_attr - std_attr, mean_attr + std_attr, alpha=0.2, color='red')
             plt.xlabel("Wavelength (nm)")
             plt.ylabel("Mean Absolute Attribution")
+            plt.tight_layout()
             plt.show()
+
+            wavs = wav
+            imps = mean_attr
+            half = 16  
+            centers = []
+            windowtot = []
+            for center in np.arange(wavs.min()+half,wavs.max()-half, 1):
+                mask = (wavs >= center-half) & (wavs <= center+half)
+                centers.append(center)
+                windowtot.append(imps[mask].sum())
+            centers = np.array(centers)
+            windowtot = np.array(windowtot)
+            plt.figure(figsize=(15, 5))
+            plt.plot(centers, windowtot, color='blue', linewidth=1.5)
 
     mean_train = np.array(all_trainloss).mean(axis=0)
     std_train = np.array(all_trainloss).std(axis=0)
     mean_val = np.array(all_valloss).mean(axis=0)
     std_val = np.array(all_valloss).std(axis=0)
+    std_val = std_val/np.sqrt(5)
     ep = np.arange(epochs)
-    plt.figure(figsize=(10, 5))
-    plt.plot(mean_train, color='blue', label='Train Loss')
-    plt.fill_between(ep, mean_train - std_train, mean_train + std_train, alpha=0.2, color='blue', label='Std. Dev.')
-    plt.plot(mean_val, color='red', label='Validation Loss')
-    plt.fill_between(ep, mean_val - std_val, mean_val + std_val, alpha=0.2, color='red', label='Std. Dev.')
+    plt.figure(figsize=(3.5, 2.65),dpi=300)
+    plt.plot(mean_train, color='blue', linestyle='--')
+    plt.fill_between(ep, mean_train - std_train, mean_train + std_train, alpha=0.2, color='blue')
+    plt.plot(mean_val, color='red')
+    plt.fill_between(ep, mean_val - std_val, mean_val + std_val, alpha=0.2, color='red')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
-    plt.legend()
+    plt.tight_layout()
     plt.show()
 
 
@@ -345,9 +369,6 @@ plt.show()
 
 
 
-
-
-#============
 #test set bit
 
 if USE_SCALING:
@@ -382,7 +403,7 @@ for epoch in range(epochs):
 modeltest.eval()
 with torch.no_grad():
     test_out = modeltest(x_testt)
-    _, y_predtest = torch.max(test_out, 1)
+    y_predtest = torch.argmax(test_out, 1)
 
     probs = torch.softmax(test_out, 1)
     shentropy = entropy(probs.numpy(), base=2, axis=1)
@@ -394,17 +415,15 @@ print("-"*50)
 test_acc = accuracy_score(testtrue_labels, testpred_labels)
 print(f"Test Accuracy: {test_acc:.4f}")
 print("Classification Report:")
-print(classification_report(testtrue_labels, testpred_labels))
+print(classification_report(testtrue_labels, testpred_labels,digits=4))
+print(f"Cohen's Kappa: {cohen_kappa_score(testtrue_labels, testpred_labels):.4f}")
 
 
 
-
-'''
-if INDICES and OAKONLY==False and GUMCOMB==False and CUSTOM==False:
+if SAVEFIG:
     results_df = pd.DataFrame({'y_true': testtrue_labels,'y_pred_mlp': testpred_labels})
-    results_df.to_csv('mlp_predictions.csv', index=False)
+    results_df.to_csv(name, index=False)
     print("saved to CSV")
-'''
 
 if TESTGRAPHS:
 
@@ -442,7 +461,6 @@ if TESTGRAPHS:
     cm = confusion_matrix(testtrue_labels, testpred_labels)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=displaylabels)
     disp.plot(cmap=plt.cm.Blues)
-    plt.title("Confusion test set")
     plt.show()
 
     plt.figure(figsize=(12, 6))

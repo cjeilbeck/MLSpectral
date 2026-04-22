@@ -1,4 +1,11 @@
-from A_functions import read_data, indicesmav, problemtype
+
+from pathlib import Path
+import sys
+cdir = Path(__file__).parent
+root = cdir.parent
+sys.path.append(str(root))
+
+from FUNCTIONS.A_functions import read_data, indicesmav, problemtype
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import accuracy_score, classification_report
@@ -51,7 +58,6 @@ index2 = 'GNDVI'
 plot['leaf_type']=y
 
 if BINARY:
-
     plot = problemtype(plot, 'binary')
     print("classifiying")
     plot['predicted'] = plot.apply(binaryclassify, axis=1)
@@ -60,13 +66,10 @@ if BINARY:
     classification_report = classification_report(plot['leaf_type'], plot['predicted'])
     print("Classification Report:")
     print(classification_report)
-
 if GUM:
     plot = problemtype(plot, 'gum')
 
 fig = plt.figure(figsize=(10, 7))
-
-
 xx = index1
 yy = index2
 

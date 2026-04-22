@@ -1,5 +1,14 @@
 import numpy as np
 import torch
+import sys
+from pathlib import Path
+
+
+cdir = Path(__file__).parent
+root = cdir.parent
+sys.path.append(str(root))
+
+
 import torch.nn as nn
 import torch.optim as optim
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
@@ -7,25 +16,31 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
 import pandas as pd
 from skorch import NeuralNetClassifier
-from A_functions import read_data, indicesmav, indicescustomMLP, haircut, problemtype
+from FUNCTIONS.A_functions import read_data, indicesmav, indicescustomMLP, haircut, problemtype
 from sklearn.preprocessing import FunctionTransformer
 from scipy.signal import savgol_filter
 from skorch.callbacks import EarlyStopping
 import pandas as pd
+import random
+import os
 
 def apply_savgol(x):
     return savgol_filter(x, window_length=51, polyorder=3, axis=1)
 
 HAIRCUT = True
 left, right = 206, 910
-INDICES = False
-SAVGOL=True
-CUSTOM = True 
 
-#typesofdatasetup
+SAVGOL=True
+
+
+#indices is commercial data, custom is custom bands; both off for hyperspectral processing
+INDICES = False
+CUSTOM = True 
 GUMCOMB = False
 OAKONLY = False
 TESTGUM = False
+
+
 if GUMCOMB: 
     problem = 'binary'
 elif OAKONLY: 
@@ -44,8 +59,7 @@ if CUSTOM:
     HAIRCUT = False
     SAVGOL = False
 
-import random
-import os
+
 
 seed = 42
 os.environ['PYTHONHASHSEED'] = str(seed)
@@ -171,6 +185,12 @@ print(f"Best Error: {best_error:.4f}")
 #11   {'net__lr': 0.001, 'net__module__drop': 0.2, 'net__module__layer_sizes': (32, 16)}                 0.988333                0.011304             355.4        99.177820
 #3    {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.986667                0.010000              85.2        29.822139
 
+"""green = M(425)
+    red = M(555)  
+    re = M(665)  
+    nir = M(700)"""
+
+3   # {'net__lr': 0.01, 'net__module__drop': 0.2, 'net__module__layer_sizes': (128, 64)}                 0.996667                0.004082              64.4        10.287857
 
 #GUMCOMB
 

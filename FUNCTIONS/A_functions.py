@@ -227,6 +227,33 @@ def indicesmav(x):   #assuming mavic 3M
  
     return pd.DataFrame(ids, index=x.index) 
 
+def indicesmavbands(x):   #assuming mavic 3M
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+
+    ids = {}
+    ids['Green'] = M(560) 
+    ids['Red'] = M(650)
+    ids['Red-edge'] = M(730)
+    ids['NIR'] = M(860, width=52)
+ 
+    return pd.DataFrame(ids, index=x.index) 
+
+
+def indicesmavindices(x):   #assuming mavic 3M
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+
+    ids = {}
+    ids['NDVI']= (M(860, width=52)-M(650))/(M(860, width=52)+M(650))
+    ids['GNDVI']=(M(860,width=52)-M(560))/(M(860,width=52)+M(560))
+    ids['OSAVI']= (M(860, width=52)-M(650))/(M(860, width=52)+M(650)+0.16)
+    ids['LCI']= (M(860, width=52)-M(730))/(M(860, width=52)+M(650))
+    ids['NDRE']= (M(860, width=52)-M(730))/(M(860, width=52)+M(730))
+ 
+    return pd.DataFrame(ids, index=x.index) 
 
 def indices_single(x, index):
     def M(w, width=32):
@@ -256,7 +283,6 @@ def indices_single(x, index):
         ids['Total Intensity']=M(640, width = 500)
     
     return pd.DataFrame(ids, index=x.index)
-    
 
 def indicescustomrf(x):  
     def M(w, width=32):
@@ -269,15 +295,15 @@ def indicescustomrf(x):
 
     ids = {}
     
-    ids['Green'] = green
-    ids['Red'] = red
-    ids['Red-edge'] = re
-    ids['NIR'] = nir
-    ids['NDVI'] = (nir-red) / (nir+red)
-    ids['GNDVI'] = (nir -green) / (nir+ green)
-    ids['OSAVI'] = (nir-red) / (nir+red + 0.16)
-    ids['LCI'] = (nir-re) / (nir +red)
-    ids['NDRE'] = (nir-re) / (nir+re)
+    ids['Band1'] = green
+    ids['Band2'] = red
+    ids['Band3'] = re
+    ids['Band4'] = nir
+    ids['CVI42'] = (nir-red) / (nir+red)
+    ids['CVI41'] = (nir -green) / (nir+ green)
+    ids['CVI42a'] = (nir-red) / (nir+red + 0.16)
+    ids['CVI432'] = (nir-re) / (nir +red)
+    ids['CVI43'] = (nir-re) / (nir+re)
  
     return pd.DataFrame(ids, index=x.index)
 
@@ -286,44 +312,158 @@ def indicescustomMLP(x):
         intensity = multispectral(x, [w], width=width, Dif=False)
         return intensity.iloc[:, 0]
     green = M(425)
-    red = M(485)  
+    red = M(555)  
     re = M(665)  
     nir = M(700)
 
     ids = {}
     
-    ids['Green'] = green
-    ids['Red'] = red
-    ids['Red-edge'] = re
-    ids['NIR'] = nir
-    ids['NDVI'] = (nir-red) / (nir+red)
-    ids['GNDVI'] = (nir -green) / (nir+ green)
-    ids['OSAVI'] = (nir-red) / (nir+red + 0.16)
-    ids['LCI'] = (nir-re) / (nir +red)
-    ids['NDRE'] = (nir-re) / (nir+re)
+    ids['Band1'] = green
+    ids['Band2'] = red
+    ids['Band3'] = re
+    ids['Band4'] = nir
+    ids['CVI42'] = (nir-red) / (nir+red)
+    ids['CVI41'] = (nir -green) / (nir+ green)
+    ids['CVI42a'] = (nir-red) / (nir+red + 0.16)
+    ids['CVI432'] = (nir-re) / (nir +red)
+    ids['CVI43'] = (nir-re) / (nir+re)
  
+    return pd.DataFrame(ids, index=x.index)
+
+def indicescustomMLP_single(x, index):  
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+
+    ids = {}
+    
+    if index == 'Band1':
+        ids['Band1'] = M(425)
+    elif index == 'Band2':
+        ids['Band2'] = M(555)
+    elif index == 'Band3':
+        ids['Band3'] = M(665)
+    elif index == 'Band4':
+        ids['Band4'] = M(700)
+    elif index == 'CVI42':
+        ids['CVI42'] = (M(700)-M(555)) / (M(700)+M(555))
+    elif index == 'CVI41':
+        ids['CVI41'] = (M(700)-M(425)) / (M(700)+M(425))
+    elif index == 'CVI42a':
+        ids['CVI42a'] = (M(700)-M(555)) / (M(700) + M(555) + 0.16)
+    elif index == 'CVI432':
+        ids['CVI432'] = (M(700)-M(665)) / (M(700)+M(555))
+    elif index == 'CVI43':
+        ids['CVI43'] = (M(700)-M(665)) / (M(700)+M(665))
     return pd.DataFrame(ids, index=x.index)
 
 def indicescustomSVM(x):   
     def M(w, width=32):
         intensity = multispectral(x, [w], width=width, Dif=False)
         return intensity.iloc[:, 0]
-    green = M(440)
+    
+    """green = M(455)
+    red = M(558)
+    re = M(674)
+    nir = M(710)"""
+
+    green = M(450)
     red = M(555)
     re = M(675)
     nir = M(710)
+    ids = {}
+    
+    ids['Band1'] = green
+    ids['Band2'] = red
+    ids['Band3'] = re
+    ids['Band4'] = nir
+    ids['CVI42'] = (nir-red) / (nir+red)
+    ids['CVI41'] = (nir -green) / (nir+ green)
+    ids['CVI42a'] = (nir-red) / (nir+red + 0.16)
+    ids['CVI432'] = (nir-re) / (nir +red)
+    ids['CVI43'] = (nir-re) / (nir+re)
+ 
+    return pd.DataFrame(ids, index=x.index)
+
+import pandas as pd
+
+def indicescustomSVM_single(x, index):   
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
+    
+    ids = {}
+    
+    if index == 'Band1':
+        ids['Band1'] = M(450)  
+    elif index == 'Band2':
+        ids['Band2'] = M(555) 
+    elif index == 'Band3':
+        ids['Band3'] = M(675)  
+    elif index == 'Band4':
+        ids['Band4'] = M(710)  
+    elif index == 'CVI42':
+        nir = M(710)
+        red = M(555)
+        ids['CVI42'] = (nir-red) / (nir+red)
+    elif index == 'CVI41':
+        nir = M(710)
+        green = M(450)
+        ids['CVI41'] = (nir-green) / (nir+green)
+    elif index == 'CVI42a':
+        nir = M(710)
+        red = M(555)
+        ids['CVI42a'] = (nir-red) / (nir+red + 0.16)
+    elif index == 'CVI432':
+        nir = M(710)
+        re = M(675)
+        red = M(555)
+        ids['CVI432'] = (nir-re) / (nir+red)
+    elif index == 'CVI43':
+        nir = M(710)
+        re = M(675)
+        ids['CVI43'] = (nir-re) / (nir+re)
+ 
+    return pd.DataFrame(ids, index=x.index)
+
+import pandas as pd
+
+def indicescustomrf_single(x, index):  
+    def M(w, width=32):
+        intensity = multispectral(x, [w], width=width, Dif=False)
+        return intensity.iloc[:, 0]
 
     ids = {}
     
-    ids['Green'] = green
-    ids['Red'] = red
-    ids['Red-edge'] = re
-    ids['NIR'] = nir
-    ids['NDVI'] = (nir-red) / (nir+red)
-    ids['GNDVI'] = (nir -green) / (nir+ green)
-    ids['OSAVI'] = (nir-red) / (nir+red + 0.16)
-    ids['LCI'] = (nir-re) / (nir +red)
-    ids['NDRE'] = (nir-re) / (nir+re)
+    if index == 'Band1':
+        ids['Band1'] = M(415)  
+    elif index == 'Band2':
+        ids['Band2'] = M(545)  
+    elif index == 'Band3':
+        ids['Band3'] = M(675)  
+    elif index == 'Band4':
+        ids['Band4'] = M(715)  
+    elif index == 'CVI42':
+        nir = M(715)
+        red = M(545)
+        ids['CVI42'] = (nir-red) / (nir+red)
+    elif index == 'CVI41':
+        nir = M(715)
+        green = M(415)
+        ids['CVI41'] = (nir- green) / (nir+green)
+    elif index == 'CVI42a':
+        nir = M(715)
+        red = M(545)
+        ids['CVI42a'] = (nir-red) / (nir+red + 0.16)
+    elif index == 'CVI432':
+        nir = M(715)
+        re = M(675)
+        red = M(545)
+        ids['CVI432'] = (nir-re) / (nir+red)
+    elif index == 'CVI43':
+        nir = M(715)
+        re = M(675)
+        ids['CVI43'] = (nir-re) / (nir+re)
  
     return pd.DataFrame(ids, index=x.index)
 
@@ -350,54 +490,56 @@ def indicescustom(x):
  
     return pd.DataFrame(ids, index=x.index)
 
-def indexplot1D(file, index, thresholds, labels, ax, labelsize, legendsize, truelabels='leaf_type', testing=True):
+def indexplot1D(file, index, thresholds, labels, ax, truelabels='leaf_type', customlabels=None, testing=True, highlightindex=False,multiple=False):
     
     plot = file.copy()
     min_x = plot[index].min()
     max_x = plot[index].max()
     bins = [min_x] + thresholds + [max_x]
-    print(bins)
+    print(f"Index: {index}:", bins)
+    
     plot['predicted'] = pd.cut(plot[index], bins=bins, labels=labels, ordered=False, include_lowest=True)
 
     if testing:
         t,test = train_test_split(plot, test_size=0.2, random_state=42, stratify = plot['leaf_type'])
         acc = accuracy_score(test['predicted'], test[truelabels])
         print(f"accuracy:{acc:.4f}")
-        print(classification_report(test['predicted'], test[truelabels]))
 
-    fig = ax.get_figure()
-    sns.histplot(data=plot, x=index, hue='leaf_type', kde=True, palette='Set2',ax=ax)
-
+    if customlabels:
+        plot['leaf_type'] = plot['leaf_type'].map(customlabels)
+        labels = [customlabels[label] for label in labels]
+    
     colour_map = {
-        
-        'Young Gum': 'lightsalmon',
-        'Old Gum': 'lightblue',
-        'Oak': 'lightgreen',
-        'Pine': 'thistle',
-        'Gum': 'lightblue',
-        'Other': 'thistle'
-
+    'Young Gum': "#ff9100",   
+    'Old Gum': '#1b7837',     
+    'Oak': "#1316ed",         
+    'Pine': "#ec1567",        
+    'Gum': "#25cd58",         
+    'Other': '#d95f02',       
     }
-
-    currentylim = ax.get_ylim()[1]
+   
+    fig = ax.get_figure()
+    sns.histplot(data=plot, x=index, hue='leaf_type', kde=True, palette=colour_map,ax=ax,legend=False, stat='density', common_norm=False)
+    #stat = density common norm = false if u want each hist to integrate to 1 
+   
     for left,right, label in zip(bins[:-1], bins[1:] ,labels):
-        ax.axvspan(left,right,color = colour_map[label], alpha = 0.3)
-        mid = (left+right)/2
-        ax.text(mid, currentylim*0.95, label, ha="center", fontsize = labelsize, fontweight='bold', color='black', bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+        ax.axvspan(left,right,color = colour_map[label], alpha = 0.2)
 
     for thresh in thresholds:
-        ax.axvline(x=thresh, color='black', linestyle='--', linewidth=2, label=f'Bound:{thresh:.3f}')
+        ax.axvline(x=thresh, color='black', linestyle='--')
+
+    if testing:
+        ax.set_title(f"Test Accuracy: {acc:.3f}")
 
     ax.set_xlabel(index)
-    handles, llabels = ax.get_legend_handles_labels()
-    if testing:
-        ax.legend(handles=handles, fontsize = legendsize, title_fontsize = legendsize, title=f"Test Accuracy: {acc:.3f}", labels=llabels, bbox_to_anchor=(1.05, 1))
-
+    if multiple:
+        fig.supylabel('Normalised Density')
+        ax.set_ylabel('')
     else:
-        ax.legend(handles=handles, labels=llabels, bbox_to_anchor=(1.05, 1))
+        ax.set_ylabel('Normalised Density')
+   
+    
     fig.tight_layout()
-
-    ax.set_xlim(min_x - 0.05*((max_x-min_x)/2), max_x + 0.05*(max_x-min_x)/2) #optional padding but might have to remove for sake of space when 9 plots
     
   
     return ax
@@ -413,6 +555,9 @@ def problemtype(file, problemtype):
     elif problemtype == 'oak':
         data['leaf_type'] = data['leaf_type'].replace(['Gum_young', 'Gum_old', 'Pine'], 'Other')
         data['leaf_type'] = data['leaf_type'].replace(['Oakcork'], 'Oak')
+    elif problemtype == 'pine':
+        data['leaf_type'] = data['leaf_type'].replace(['Gum_young', 'Gum_old', 'Oakcork'], 'Other')
+        data['leaf_type'] = data['leaf_type'].replace(['Pine'], 'Pine')
     return data
 
 
@@ -421,7 +566,7 @@ customlabels = {'Gum_old':  'Old Gum',
     'Oakcork':  'Oak',
     'Pine':     'Pine'}
     
-def KDEpriorfunction(file, index, truelabels='leaf_type'):
+def KDEfunction(file, index, truelabels='leaf_type',prioradj=True,priorarr = None):
     classes = file[truelabels].unique()
     nsamples = len(file[index])
 
@@ -436,15 +581,18 @@ def KDEpriorfunction(file, index, truelabels='leaf_type'):
     for c in classes:
         data = file[file[truelabels]==c][index]
         kdes[c] = gaussian_kde(data)
-        print(len(data))
-        print(nsamples)
-        priors[c] = len(data)/nsamples
+        if priorarr is not None:
+            priors[c] = priorarr[c]
+        else:
+            priors[c] = len(data)/nsamples
 
     prob = np.zeros((len(classes), len(base)))
 
-    for i, c in enumerate(classes):
-        if c in kdes:
+    for i, c in enumerate(classes): 
+        if prioradj:
             prob[i,:] = kdes[c](base)*priors[c]
+        else:
+            prob[i,:] = kdes[c](base)
         
     best = np.argmax(prob, axis=0)
     boundary = np.where(np.diff(best) !=0)[0]

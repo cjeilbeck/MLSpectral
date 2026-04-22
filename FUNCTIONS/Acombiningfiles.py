@@ -1,7 +1,10 @@
 import pandas as pd
 from pathlib import Path
 
-directory = Path('.') 
+cdir = Path(__file__).parent
+root = cdir.parent
+directory = root/"SPECDATA"
+
 skip = 14
 ignore = ['Calibration1','Calibration2','Calibration3','Calibration4'] 
 
@@ -13,7 +16,7 @@ for classfolder in directory.iterdir():
             filename = file.name
             part = filename.split('__')[1]
             sample_id = part.split('_')[0]
-            data = pd.read_csv(file,skiprows=skip,header=None,names=['Wavelength','Counts'],delim_whitespace=True)
+            data = pd.read_csv(file,skiprows=skip,header=None,names=['Wavelength','Counts'],sep ='\s+')
             data['leaf_type'] = leaf_type 
             data['sample_id'] = f"{leaf_type}_{sample_id}" 
             all_data.append(data)
